@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Search, Plus, ChevronRight, X, Save, Home, PawPrint, Stethoscope,
-  Heart, Skull, AlertTriangle, Trash2, ArrowLeft, Loader2, Check
+  Heart, Skull, AlertTriangle, Trash2, ArrowLeft, Loader2, Check, LogOut
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
-
+import Login from "./Login";
 // ---------------------------------------------------------------------------
 // Constantes de domínio
 // ---------------------------------------------------------------------------
@@ -192,9 +192,15 @@ export default function App() {
   const [busca, setBusca] = useState("");
   const [toast, setToast] = useState(null);
 
-  if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
-    return <ConfigAviso />;
-  }
+  const [session, setSession] = useState(undefined);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+    return () => listener.subscription.unsubscribe();
+  }, []);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -212,12 +218,28 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+    if (session) loadAll();
+  }, [loadAll, session]);
+
+  if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+    return <ConfigAviso />;
+  }
+
+  if (session === undefined) {
+    return null;
+  }
+
+  if (!session) {
+    return <Login onLogin={setSession} />;
+  }
 
   function showToast(msg) {
     setToast(msg);
     setTimeout(() => setToast(null), 2200);
+  }
+
+  async function sair() {
+    await supabase.auth.signOut();
   }
 
   const buscaLower = busca.trim().toLowerCase();
@@ -255,8 +277,14 @@ export default function App() {
             );
           })}
         </nav>
-        <div className="px-5 py-4 border-t border-white/10 text-[11px] text-[#7C93A0]">
-          Registros compartilhados da equipe
+        <div className="px-5 py-4 border-t border-white/10">
+          <p className="text-[11px] text-[#7C93A0] mb-2 truncate">{session.user?.email}</p>
+          <button
+            onClick={sair}
+            className="w-full flex items-center gap-2 text-sm text-[#B8CBD6] hover:text-white transition-colors"
+          >
+            <LogOut size={14} /> Sair
+          </button>
         </div>
       </aside>
 
