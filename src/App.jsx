@@ -25,7 +25,7 @@ const CROMO_OPCOES = [
   { v: "0", label: "0 — Ausente / Sem alterações" },
   { v: "1", label: "1 — Leve" },
   { v: "2", label: "2 — Moderada" },
-  { v: "3", label: "3 — Severa" },
+  { v: "3", size: "3 — Severa" },
 ];
 
 const MODULOS = [
@@ -204,7 +204,7 @@ function SecaoForm({ titulo, children }) {
       <h3 className="text-xs font-bold uppercase tracking-wider text-[#4A7C7C] border-b pb-1.5 flex items-center gap-2">
         <span>{titulo}</span>
       </h3>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">{children}</div>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">{children}</div>
     </div>
   );
 }
@@ -408,7 +408,7 @@ function Dashboard({ animais, atendimentos, necropsias, reproducoes, goTo }) {
 }
 
 // ---------------------------------------------------------------------------
-// Módulo Animais
+// Módulo Animais (Com Seleção das Unidades Oficiais de Biotérios da UFRN)
 // ---------------------------------------------------------------------------
 function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparForcarEdicao }) {
   const [form, setForm] = useState(null);
@@ -424,7 +424,7 @@ function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparF
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-sm font-bold uppercase tracking-wider text-gray-500">Mapeamento de Espécimes</h2>
-        <Btn onClick={() => { setForm({ status: "Ativo", especie: "Rato", linhagem: "Wistar", categoria: "Matriz" }); limparForcarEdicao(); }}><Plus size={13} /> Cadastrar Animal</Btn>
+        <Btn onClick={() => { setForm({ status: "Ativo", especie: "Rato", linhagem: "Wistar", categoria: "Matriz", origem: "Biotério Central" }); limparForcarEdicao(); }}><Plus size={13} /> Cadastrar Animal</Btn>
       </div>
 
       {form && (
@@ -433,7 +433,11 @@ function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparF
           if (!form.sip?.trim()) return alert("Código SIP é obrigatório.");
           await saveRecord("animais", form);
           setForm(null); limparForcarEdicao(); showToast("Registro salvo com sucesso"); reload();
-        }} className="bg-white border rounded-lg p-4 space-y-4 shadow-sm">
+        }} className="bg-white border rounded-lg p-5 space-y-4 shadow-sm text-left">
+          
+          <div className="border-b pb-1 mb-2">
+            <span className="text-xs font-bold uppercase text-[#4A7C7C]">Identificação Básica e Categoria</span>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <Field label="Código SIP Identificador" required><TextInput value={form.sip || ""} onChange={e => setForm({...form, sip: e.target.value})} disabled={!!form.created_at} placeholder="Ex: BC-WS-01" /></Field>
             <Field label="Espécie"><Select value={form.especie || "Rato"} onChange={e => setForm({...form, especie: e.target.value})}><option>Rato</option><option>Camundongo</option></Select></Field>
@@ -441,11 +445,29 @@ function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparF
             <Field label="Sexo Anatômico"><Select value={form.sexo || "Fêmea"} onChange={e => setForm({...form, sexo: e.target.value})}><option>Fêmea</option><option>Macho</option></Select></Field>
             <Field label="Categoria Biotécnica"><Select value={form.categoria || "Matriz"} onChange={e => setForm({...form, categoria: e.target.value})}><option>Matriz</option><option>Reprodutor</option><option>Manutenção</option><option>Experimentação</option></Select></Field>
             <Field label="Data Nascimento"><TextInput type="date" value={form.data_nascimento || ""} onChange={e => setForm({...form, data_nascimento: e.target.value})} /></Field>
-            <Field label="Origem do Animal"><TextInput value={form.origem || ""} onChange={e => setForm({...form, origem: e.target.value})} placeholder="Ex: Maternidade Interna" /></Field>
+            
+            {/* Campo Origem Atualizado com a Lista Real de Unidades */}
+            <Field label="Origem do Animal"><Select value={form.origem || "Biotério Central"} onChange={e => setForm({...form, origem: e.target.value})}><option>Biotério Central</option><option>Biotério LENq</option><option>Biotério PPGBIOEF</option><option>Biotério LABMAT</option><option>Outro</option></Select></Field>
+            
             <Field label="Status Cadastral"><Select value={form.status || "Ativo"} onChange={e => setForm({...form, status: e.target.value})}><option>Ativo</option><option>Óbito</option><option>Eutanásia</option></Select></Field>
           </div>
-          <Field label="Notas Adicionais / Observações Gênicas"><TextArea value={form.observacoes || ""} onChange={e => setForm({...form, observacoes: e.target.value})} placeholder="Escreva detalhes de linhagem, progênie, etc..." /></Field>
-          <div className="flex gap-2"><Btn type="submit">Salvar Cadastro</Btn><Btn type="button" variant="ghost" onClick={() => { setForm(null); limparForcarEdicao(); }}>Cancelar</Btn></div>
+
+          <div className="border-t border-b pb-1 pt-2 my-2">
+            <span className="text-xs font-bold uppercase text-[#4A7C7C]">Filiação e Responsabilidade</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <Field label="Código SIP da Mãe (Matriz)"><TextInput value={form.mae_id || ""} onChange={e => setForm({...form, mae_id: e.target.value})} placeholder="Ex: SIP da Mãe" /></Field>
+            <Field label="Código SIP do Pai (Reprodutor)"><TextInput value={form.pai_id || ""} onChange={e => setForm({...form, pai_id: e.target.value})} placeholder="Ex: SIP do Pai" /></Field>
+            <Field label="Responsável Técnico / Pesquisador"><TextInput value={form.responsavel_tecnico || ""} onChange={e => setForm({...form, responsavel_tecnico: e.target.value})} placeholder="Nome do pesquisador responsável" /></Field>
+            
+            {/* Protocolo CEUA aparece apenas para Experimentação */}
+            {form.categoria === "Experimentação" && (
+              <Field label="Número Protocolo CEUA" required><TextInput value={form.protocolo_ceua || ""} onChange={e => setForm({...form, protocolo_ceua: e.target.value})} placeholder="Ex: 12345/2026" /></Field>
+            )}
+          </div>
+
+          <Field label="Notas Adicionais / Observações Gênicas"><TextArea value={form.observacoes || ""} onChange={e => setForm({...form, observacoes: e.target.value})} placeholder="Escreva detalhes de linhagem, progênie, mutações estruturais..." /></Field>
+          <div className="flex gap-2 pt-2 border-t"><Btn type="submit">Salvar Cadastro</Btn><Btn type="button" variant="ghost" onClick={() => { setForm(null); limparForcarEdicao(); }}>Cancelar</Btn></div>
         </form>
       )}
 
@@ -683,7 +705,7 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
       )}
 
       <div className="flex gap-2 border-b pb-2">
-        <button onClick={() => setAba("ativos")} className={`px-3 py-1.5 text-xs font-bold rounded ${aba === "ativos" ? "bg-[#1B3A54] text-white" : "bg-white border text-gray-500"}`}>Casais em Produção Ativa ({reproducoes.filter(r => !r.term_data_matriz && !r.term_data_reprodutor).length})</button>
+        <button onClick={() => setAba("ativos")} className={`px-3 py-1.5 text-xs font-bold rounded ${aba === "ativos" ? "bg-[#1B3A54] text-white" : "bg-white border text-gray-500"}`}>Casais em Production Ativa ({reproducoes.filter(r => !r.term_data_matriz && !r.term_data_reprodutor).length})</button>
         <button onClick={() => setAba("inativos")} className={`px-3 py-1.5 text-xs font-bold rounded ${aba === "inativos" ? "bg-amber-800 text-white" : "bg-white border text-gray-500"}`}>Colônias Desativadas ({reproducoes.filter(r => r.term_data_matriz || r.term_data_reprodutor).length})</button>
       </div>
 
@@ -953,6 +975,19 @@ function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, voltar, onEdit
           <div>Tempo de Vida: <strong className="text-gray-700">{calcIdadeApenasMeses(animal.data_nascimento)}</strong></div>
           <div>Origem: <strong className="text-gray-700">{animal.origem || "Não Informada"}</strong></div>
         </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2 pt-2 border-t border-gray-100 text-xs text-gray-500">
+          <div>Matriz Mãe: <strong className="text-[#4A7C7C]">{animal.mae_id || "Não Informado"}</strong></div>
+          <div>Reprodutor Pai: <strong className="text-[#3E5C8A]">{animal.pai_id || "Não Informado"}</strong></div>
+          <div>Responsável Técnico: <strong className="text-gray-700">{animal.responsavel_tecnico || "Não Informado"}</strong></div>
+        </div>
+
+        {animal.categoria === "Experimentação" && animal.protocolo_ceua && (
+          <div className="mt-2 p-2 bg-blue-50/50 border border-blue-100 text-xs rounded text-blue-900">
+            Protocolo de Aprovação CEUA: <strong>{animal.protocolo_ceua}</strong>
+          </div>
+        )}
+
         {animal.observacoes && <div className="mt-3 text-xs bg-gray-50 p-2.5 rounded text-gray-600 border border-dashed italic">Notas Internas: {animal.observacoes}</div>}
       </div>
 
