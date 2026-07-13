@@ -135,6 +135,7 @@ function SipBadge({ sip, linhagem }) {
   );
 }
 
+// Card do Animal
 function CardAnimalCompacto({ animal, onClick }) {
   return (
     <button 
@@ -297,7 +298,6 @@ export default function App() {
     await supabase.auth.signOut();
   }
 
-  // Função central para apagar animal e atualizar a tela
   async function tratarExcluirAnimal(sip) {
     try {
       await deleteRecord("animais", "sip", sip);
@@ -455,21 +455,31 @@ function BuscaResultados({ resultados, onSelect }) {
 }
 
 // ---------------------------------------------------------------------------
-// Dashboard
+// Dashboard (Filtrado Apenas por Animais Ativos/Vivos)
 // ---------------------------------------------------------------------------
 
 function Dashboard({ animais, atendimentos, necropsias, reproducoes, goTo }) {
-  const ativos = animais.filter((a) => a.status === "Ativo").length;
+  // Ajuste Lara: Filtra apenas animais Ativos (vivos) para o levantamento
+  const animaisAtivos = animais.filter((a) => a.status === "Ativo" || !a.status);
+  const totalAtivos = animaisAtivos.length;
+
   const stats = [
-    { label: "Animais cadastrados", value: animais.length, sub: `${ativos} ativos`, mod: "animais", icon: PawPrint },
+    { label: "Animais Ativos", value: totalAtivos, sub: "Vivos no Biotério", mod: "animais", icon: PawPrint },
     { label: "Atendimentos registrados", value: atendimentos.length, sub: "fichas veterinárias", mod: "atendimentos", icon: Stethoscope },
     { label: "Prontuários de reprodução", value: reproducoes.length, sub: "matrizes acompanhadas", mod: "reproducao", icon: Heart },
-    { label: "Necropsias", value: necropsias.length, sub: "registros", mod: "necropsias", icon: Skull },
+    { label: "Necropsias", value: necropsias.length, sub: "registros post-mortem", mod: "necropsias", icon: Skull },
   ];
+  
   const recentes = atendimentos.slice(0, 5);
 
-  const totNinhadas = reproducoes.reduce((acc, r) => acc + (r.ninhadas?.length || 0), 0);
-  const totGeral = reproducoes.reduce(
+  // Filtra prontuários reprodutivos cujas matrizes principais ainda estão ativas no biotério
+  const reproducoesAtivas = reproducoes.filter((r) => {
+    const animalCorresp = animais.find((a) => a.sip === r.sip);
+    return animalCorresp ? (animalCorresp.status === "Ativo" || !animalCorresp.status) : true;
+  });
+
+  const totNinhadas = reproducoesAtivas.reduce((acc, r) => acc + (r.ninhadas?.length || 0), 0);
+  const totGeral = reproducoesAtivas.reduce(
     (acc, r) => {
       const t = totaisNinhadas(r.ninhadas);
       return {
@@ -480,14 +490,15 @@ function Dashboard({ animais, atendimentos, necropsias, reproducoes, goTo }) {
     },
     { nascidos: 0, mortos: 0, desmamados: 0 }
   );
+
   const taxaSobrevivencia = totGeral.nascidos > 0
     ? Math.round(((totGeral.nascidos - totGeral.mortos) / totGeral.nascidos) * 100)
     : null;
-  const matrizesAtivas = reproducoes.filter((r) => !r.data_encerramento).length;
-  const mediaNinhadaPorMatriz = reproducoes.length > 0 ? (totNinhadas / reproducoes.length).toFixed(1) : "0";
+  const matrizesAtivas = reproducoesAtivas.filter((r) => !r.data_encerramento).length;
+  const mediaNinhadaPorMatriz = reproducoesAtivas.length > 0 ? (totNinhadas / reproducoesAtivas.length).toFixed(1) : "0";
 
   const indicadores = [
-    { label: "Ninhadas registradas", value: totNinhadas },
+    { label: "Ninhadas (Plantel Ativo)", value: totNinhadas },
     { label: "Total de nascidos", value: totGeral.nascidos },
     { label: "Taxa de sobrevivência", value: taxaSobrevivencia !== null ? `${taxaSobrevivencia}%` : "—" },
     { label: "Matrizes ativas", value: matrizesAtivas },
@@ -498,7 +509,7 @@ function Dashboard({ animais, atendimentos, necropsias, reproducoes, goTo }) {
   return (
     <div>
       <h2 className="text-xl font-semibold mb-1">Visão geral</h2>
-      <p className="text-sm text-[#8A8574] mb-6">Registros clínicos e reprodutivos do biotério, sincronizados entre a equipe.</p>
+      <p className="text-sm text-[#8A8574] mb-6">Levantamento em tempo real do efetivo ativo e estatísticas populacionais.</p>
 
       <div className="grid grid-cols-4 gap-4 mb-8">
         {stats.map((s) => {
@@ -514,7 +525,7 @@ function Dashboard({ animais, atendimentos, necropsias, reproducoes, goTo }) {
         })}
       </div>
 
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-[#5C5C52] mb-3">Indicadores reprodutivos</h3>
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-[#5C5C52] mb-3">Indicadores reprodutivos (Animais Vivos)</h3>
       <div className="grid grid-cols-6 gap-3 mb-8">
         {indicadores.map((i) => (
           <div key={i.label} className="bg-white border border-[#E4E0D4] rounded-lg p-3">
@@ -945,7 +956,7 @@ function AtendimentoForm({ inicial, animais, onSalvar, onCancelar }) {
       </SecaoForm>
 
       <SecaoForm titulo="Anamnese">
-        <TextArea value={f.anamnese} onChange={(e) => upd("anamnese", e.target.value)} placeholder="Queixa principal, histórico, tempo de evolução…" />
+        <TextArea value={f.anamnese} onChange={(e) => upd("anamnese", text.target.value)} placeholder="Queixa principal, histórico, tempo de evolução…" />
       </SecaoForm>
 
       <SecaoForm titulo="Exame físico geral">
@@ -1569,7 +1580,7 @@ function NecropsiaForm({ inicial, animais, onSalvar, onCancelar }) {
 }
 
 // ---------------------------------------------------------------------------
-// Detalhe do animal
+// Detalhe do animal (Espelhamento de Prontuários para Fêmeas e Machos)
 // ---------------------------------------------------------------------------
 
 function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, necropsias, voltar, onEditarAnimal, onExcluirAnimal }) {
@@ -1577,7 +1588,10 @@ function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, necropsias, vo
   if (!animal) return <p className="text-sm text-[#8A8574]">Animal não encontrado.</p>;
 
   const seusAtendimentos = atendimentos.filter((a) => a.sip === sip);
-  const seuProntuario = reproducoes.filter((r) => r.sip === sip);
+  
+  // Ajuste Lara: Agora filtra os prontuários se o animal for a fêmea principal (sip) OU o macho reprodutor (reprodutor_id)
+  const seuProntuario = reproducoes.filter((r) => r.sip === sip || r.reprodutor_id === sip);
+  
   const suaNecropsia = necropsias.filter((n) => n.sip === sip);
   const alertas = ALERTAS_LINHAGEM[animal.linhagem] || [];
 
@@ -1587,11 +1601,10 @@ function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, necropsias, vo
         <Btn variant="ghost" onClick={voltar} className="!px-2"><ArrowLeft size={14} /> Voltar</Btn>
         
         <div className="flex gap-2">
-          {/* Nova Funcionalidade: Botão disparador para excluir a ficha do animal */}
           <Btn 
             variant="danger"
             onClick={() => {
-              if (confirm(`Aviso: Tem certeza que deseja excluir permanentemente o animal ${animal.sip}? Isso não afetará os laudos associados de atendimento/necropsia.`)) {
+              if (confirm(`Aviso: Tem certeza que deseja excluir permanentemente o animal ${animal.sip}? Isso não afetará os laudos associados.`)) {
                 onExcluirAnimal(animal.sip);
               }
             }}
@@ -1614,7 +1627,7 @@ function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, necropsias, vo
       <div className="text-xs text-[#B5AF9E] mb-4 space-y-0.5">
         <div><strong>Data de Nascimento:</strong> {fmtDate(animal.data_nascimento)}</div>
         <div><strong>Idade do Espécime:</strong> {calcIdadeApenasMeses(animal.data_nascimento)}</div>
-        <div><strong>Status no Sistema:</strong> {animal.status}</div>
+        <div><strong>Status no Sistema:</strong> <span className={animal.status === "Ativo" ? "text-[#3A6363] font-bold" : "text-[#A6493C] font-bold"}>{animal.status || "Ativo"}</span></div>
         {animal.origem && <div><strong>Origem Cadastrada:</strong> {animal.origem}</div>}
       </div>
 
@@ -1642,7 +1655,7 @@ function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, necropsias, vo
         </div>
       )}
 
-      <Secao titulo={`Atendimentos (${seusAtendimentos.length})`}>
+      <Secao titulo={`Atendimentos Clínicos (${seusAtendimentos.length})`}>
         {seusAtendimentos.length === 0 ? <p className="text-sm text-[#8A8574]">Nenhum registro.</p> : (
           seusAtendimentos.map((r) => (
             <div key={r.id} className="border-b border-[#E4E0D4] last:border-0 py-2">
@@ -1654,15 +1667,20 @@ function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, necropsias, vo
         )}
       </Secao>
 
-      <Secao titulo={`Reprodução (${seuProntuario.length})`}>
-        {seuProntuario.length === 0 ? <p className="text-sm text-[#8A8574]">Nenhum registro.</p> : (
+      <Secao titulo={`Histórico Reprodutivo Associado (${seuProntuario.length})`}>
+        {seuProntuario.length === 0 ? <p className="text-sm text-[#8A8574]">Nenhum registro de acasalamento vinculado.</p> : (
           seuProntuario.map((r) => {
             const tot = totaisNinhadas(r.ninhadas);
             return (
-              <div key={r.id} className="border-b border-[#E4E0D4] last:border-0 py-2">
-                <p className="text-sm">
-                  {r.ninhadas?.length || 0} ninhada(s) · {tot.nascidos} nascidos{r.reprodutor_id ? ` · Reprodutor Macho: ${r.reprodutor_id}` : ""}
-                  {r.data_encerramento ? " · encerrada" : ""}
+              <div key={r.id} className="border-b border-[#E4E0D4] last:border-0 py-2 text-sm">
+                <p className="text-xs text-gray-400">Prontuário ID: {r.id}</p>
+                <p className="text-slate-800 font-medium">
+                  Matriz Mãe: <span className="font-mono bg-gray-100 px-1 rounded text-xs">{r.sip}</span> 
+                  {r.reprodutor_id && <> × Reprodutor Pai: <span className="font-mono bg-gray-100 px-1 rounded text-xs">{r.reprodutor_id}</span></>}
+                </p>
+                <p className="text-xs text-[#5C5C52] mt-0.5">
+                  Produtividade: {r.ninhadas?.length || 0} ninhada(s) · {tot.nascidos} nascidos total ({tot.machos}M/{tot.femeas}F) · {tot.desmamados} desmamados sucessivos.
+                  {r.data_encerramento && <span className="text-[#A6493C] font-semibold ml-2">(Ficha de Acasalamento Encerrada)</span>}
                 </p>
               </div>
             );
@@ -1670,7 +1688,7 @@ function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, necropsias, vo
         )}
       </Secao>
 
-      <Secao titulo={`Necropsia (${suaNecropsia.length})`}>
+      <Secao titulo={`Exames de Necropsia (${suaNecropsia.length})`}>
         {suaNecropsia.length === 0 ? <p className="text-sm text-[#8A8574]">Nenhum registro.</p> : (
           suaNecropsia.map((r) => (
             <div key={r.id} className="border-b border-[#E4E0D4] last:border-0 py-2">
