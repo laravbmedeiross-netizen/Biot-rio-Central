@@ -82,7 +82,13 @@ async function listRecords(table, orderBy) {
 }
 
 async function saveRecord(table, record) {
-  const { error } = await supabase.from(table).upsert(record);
+  // Converte campos em branco ("") para null — colunas de data no Postgres
+  // rejeitam texto vazio, só aceitam uma data válida ou null.
+  const limpo = {};
+  for (const k in record) {
+    limpo[k] = record[k] === "" ? null : record[k];
+  }
+  const { error } = await supabase.from(table).upsert(limpo);
   if (error) throw error;
 }
 
