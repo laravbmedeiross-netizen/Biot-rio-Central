@@ -598,6 +598,7 @@ function AnimalForm({ inicial, animaisExistentes, onSalvar, onCancelar, salvando
 function ModuloAtendimentos({ atendimentos, animais, reload, showToast }) {
   const [form, setForm] = useState(null);
   const [filtroSip, setFiltroSip] = useState("");
+  const [aberto, setAberto] = useState(null);
 
   async function salvar(dados) {
     const id = dados.id || genId("atd");
@@ -642,33 +643,80 @@ function ModuloAtendimentos({ atendimentos, animais, reload, showToast }) {
         <div className="grid gap-2">
           {lista.map((r) => {
             const animal = animais.find((a) => a.sip === r.sip);
+            const isAberto = aberto === r.id;
             return (
               <div key={r.id} className="bg-white border border-[#E4E0D4] rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <SipBadge sip={r.sip} linhagem={animal?.linhagem} />
-                    <span className="text-xs text-[#B5AF9E]">{fmtDate(r.data)} · {r.responsavel}</span>
+                <button
+                  type="button"
+                  onClick={() => setAberto(isAberto ? null : r.id)}
+                  className="w-full text-left"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <SipBadge sip={r.sip} linhagem={animal?.linhagem} />
+                      <span className="text-xs text-[#B5AF9E]">{fmtDate(r.data)} · {r.responsavel}</span>
+                    </div>
+                    <ChevronRight size={16} className={`text-[#B5AF9E] transition-transform ${isAberto ? "rotate-90" : ""}`} />
                   </div>
-                  <div className="flex gap-1">
-                    <Btn variant="ghost" onClick={() => setForm(r)} className="!px-2 !py-1 text-xs">Editar</Btn>
-                    <Btn variant="danger" onClick={() => excluir(r.id)} className="!px-2 !py-1 text-xs"><Trash2 size={13} /></Btn>
+                  <div className="flex gap-4 text-xs text-[#8A8574] mb-1">
+                    {r.peso && <span>Peso: {r.peso}g</span>}
+                    {r.temperatura && <span>Temp: {r.temperatura}°C</span>}
+                    {r.escore_corporal && <span>BCS: {r.escore_corporal}</span>}
                   </div>
-                </div>
-                <div className="flex gap-4 text-xs text-[#8A8574] mb-1">
-                  {r.peso && <span>Peso: {r.peso}g</span>}
-                  {r.temperatura && <span>Temp: {r.temperatura}°C</span>}
-                  {r.escore_corporal && <span>BCS: {r.escore_corporal}</span>}
-                </div>
-                <p className="text-sm text-[#2B2B24]"><span className="font-medium">Diagnóstico:</span> {r.diagnostico || "—"}</p>
-                <p className="text-sm text-[#5C5C52]"><span className="font-medium">Conduta:</span> {r.conduta || "—"}</p>
-                {r.evolucoes?.length > 0 && (
-                  <p className="text-xs text-[#4A7C7C] mt-1">{r.evolucoes.length} registro(s) de evolução clínica</p>
+                  <p className="text-sm text-[#2B2B24]"><span className="font-medium">Diagnóstico:</span> {r.diagnostico || "—"}</p>
+                  <p className="text-sm text-[#5C5C52]"><span className="font-medium">Conduta:</span> {r.conduta || "—"}</p>
+                  {r.evolucoes?.length > 0 && (
+                    <p className="text-xs text-[#4A7C7C] mt-1">{r.evolucoes.length} registro(s) de evolução clínica</p>
+                  )}
+                </button>
+
+                {isAberto && (
+                  <div className="mt-3 pt-3 border-t border-[#E4E0D4]">
+                    <DetalheCampo label="Anamnese" valor={r.anamnese} />
+                    <DetalheCampo label="Mucosas" valor={r.mucosas} />
+                    <DetalheCampo label="Hidratação" valor={r.hidratacao} />
+                    <DetalheCampo label="Exame físico geral" valor={r.exame_fisico} />
+                    {SISTEMAS_ATENDIMENTO.map((s) => (
+                      <DetalheCampo key={s.k} label={s.label} valor={r[s.k]} />
+                    ))}
+                    <DetalheCampo label="Sinais objetivos" valor={r.sinais_objetivos} />
+                    <DetalheCampo label="Exames laboratoriais" valor={r.exames_laboratoriais} />
+                    <DetalheCampo label="Tratamento" valor={r.tratamento} />
+                    <DetalheCampo label="Retorno / acompanhamento" valor={r.retorno} />
+                    <DetalheCampo label="Desfecho" valor={r.desfecho} />
+                    {r.evolucoes?.length > 0 && (
+                      <div className="mb-2">
+                        <span className="block text-xs font-semibold uppercase tracking-wide text-[#5C5C52] mb-1">Evolução clínica</span>
+                        <div className="space-y-1">
+                          {r.evolucoes.map((ev, i) => (
+                            <p key={i} className="text-sm text-[#2B2B24]">
+                              <span className="text-xs text-[#B5AF9E]">{fmtDate(ev.data)}{ev.responsavel ? ` · ${ev.responsavel}` : ""}:</span> {ev.observacao || "—"}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex gap-1 mt-3">
+                      <Btn variant="ghost" onClick={() => setForm(r)} className="!px-2 !py-1 text-xs">Editar</Btn>
+                      <Btn variant="danger" onClick={() => excluir(r.id)} className="!px-2 !py-1 text-xs"><Trash2 size={13} /> Excluir</Btn>
+                    </div>
+                  </div>
                 )}
               </div>
             );
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function DetalheCampo({ label, valor }) {
+  if (!valor) return null;
+  return (
+    <div className="mb-2">
+      <span className="block text-xs font-semibold uppercase tracking-wide text-[#5C5C52] mb-0.5">{label}</span>
+      <p className="text-sm text-[#2B2B24] whitespace-pre-wrap">{valor}</p>
     </div>
   );
 }
@@ -855,6 +903,7 @@ function totaisNinhadas(ninhadas = []) {
 
 function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
   const [form, setForm] = useState(null);
+  const [aberto, setAberto] = useState(null);
 
   async function salvar(dados) {
     const id = dados.id || genId("rep");
@@ -890,60 +939,88 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
             const animal = animais.find((a) => a.sip === r.sip);
             const tot = totaisNinhadas(r.ninhadas);
             const encerrado = !!r.data_encerramento;
+            const isAberto = aberto === r.id;
             return (
               <div key={r.id} className="bg-white border border-[#E4E0D4] rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <SipBadge sip={r.sip} linhagem={animal?.linhagem} />
-                    {r.sip_parceiro && <span className="text-xs text-[#8A8574]">× {r.sip_parceiro}</span>}
-                    {encerrado && <span className="text-xs px-2 py-0.5 rounded-full bg-[#A6493C]/10 text-[#A6493C]">Encerrada</span>}
+                <button type="button" onClick={() => setAberto(isAberto ? null : r.id)} className="w-full text-left">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <SipBadge sip={r.sip} linhagem={animal?.linhagem} />
+                      {r.sip_parceiro && <span className="text-xs text-[#8A8574]">× {r.sip_parceiro}</span>}
+                      {encerrado && <span className="text-xs px-2 py-0.5 rounded-full bg-[#A6493C]/10 text-[#A6493C]">Encerrada</span>}
+                    </div>
+                    <ChevronRight size={16} className={`text-[#B5AF9E] transition-transform ${isAberto ? "rotate-90" : ""}`} />
                   </div>
-                  <div className="flex gap-1">
-                    <Btn variant="ghost" onClick={() => setForm(r)} className="!px-2 !py-1 text-xs">Editar</Btn>
-                    <Btn variant="danger" onClick={() => excluir(r.id)} className="!px-2 !py-1 text-xs"><Trash2 size={13} /></Btn>
-                  </div>
-                </div>
+                  <p className="text-sm text-[#5C5C52]">
+                    {r.ninhadas?.length || 0} ninhada(s) · {tot.nascidos} nascidos · {tot.machos}M/{tot.femeas}F · {tot.mortos} mortos · {tot.desmamados} desmamados
+                  </p>
+                  {r.historico_clinico && <p className="text-sm text-[#2B2B24] mt-1"><span className="font-medium">Histórico clínico:</span> {r.historico_clinico}</p>}
+                </button>
 
-                {r.ninhadas?.length > 0 ? (
-                  <div className="overflow-x-auto mb-2">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="text-[#8A8574] text-left">
-                          <th className="pr-3 py-1 font-medium">Data</th>
-                          <th className="pr-3 py-1 font-medium">Nascidos</th>
-                          <th className="pr-3 py-1 font-medium">Machos</th>
-                          <th className="pr-3 py-1 font-medium">Fêmeas</th>
-                          <th className="pr-3 py-1 font-medium">Mortos</th>
-                          <th className="pr-3 py-1 font-medium">Desmamados</th>
-                          <th className="py-1 font-medium">Observações</th>
-                        </tr>
-                      </thead>
-                      <tbody className="text-[#2B2B24]">
-                        {r.ninhadas.map((n, i) => (
-                          <tr key={i} className="border-t border-[#F0EEE5]">
-                            <td className="pr-3 py-1">{fmtDate(n.data)}</td>
-                            <td className="pr-3 py-1">{n.n_nascidos || "—"}</td>
-                            <td className="pr-3 py-1">{n.n_machos || "—"}</td>
-                            <td className="pr-3 py-1">{n.n_femeas || "—"}</td>
-                            <td className="pr-3 py-1">{n.n_mortos || "—"}</td>
-                            <td className="pr-3 py-1">{n.n_desmamados || "—"}</td>
-                            <td className="py-1 text-[#5C5C52]">{n.observacoes || "—"}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    <p className="text-[11px] text-[#B5AF9E] mt-1">
-                      Total: {tot.nascidos} nascidos · {tot.machos}M/{tot.femeas}F · {tot.mortos} mortos · {tot.desmamados} desmamados
-                    </p>
+                {isAberto && (
+                  <div className="mt-3 pt-3 border-t border-[#E4E0D4]">
+                    {r.ninhadas?.filter((n) => n.data).length > 0 && (
+                      <div className="overflow-x-auto mb-3">
+                        <span className="block text-xs font-semibold uppercase tracking-wide text-[#5C5C52] mb-1">Ninhadas</span>
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="text-[#8A8574] text-left">
+                              <th className="pr-3 py-1 font-medium">Data</th>
+                              <th className="pr-3 py-1 font-medium">Nascidos</th>
+                              <th className="pr-3 py-1 font-medium">Machos</th>
+                              <th className="pr-3 py-1 font-medium">Fêmeas</th>
+                              <th className="pr-3 py-1 font-medium">Mortos</th>
+                              <th className="pr-3 py-1 font-medium">Desmamados</th>
+                              <th className="py-1 font-medium">Observações</th>
+                            </tr>
+                          </thead>
+                          <tbody className="text-[#2B2B24]">
+                            {r.ninhadas.map((n, i) => (
+                              <tr key={i} className="border-t border-[#F0EEE5]">
+                                <td className="pr-3 py-1">{fmtDate(n.data)}</td>
+                                <td className="pr-3 py-1">{n.n_nascidos || "—"}</td>
+                                <td className="pr-3 py-1">{n.n_machos || "—"}</td>
+                                <td className="pr-3 py-1">{n.n_femeas || "—"}</td>
+                                <td className="pr-3 py-1">{n.n_mortos || "—"}</td>
+                                <td className="pr-3 py-1">{n.n_desmamados || "—"}</td>
+                                <td className="py-1 text-[#5C5C52]">{n.observacoes || "—"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    <DetalheCampo label="Genealogia" valor={r.genealogia} />
+                    <DetalheCampo label="Intercorrências" valor={r.intercorrencias} />
+                    <DetalheCampo label="Tratamentos" valor={r.tratamentos} />
+
+                    {r.monitoramento?.filter((m) => m.data).length > 0 && (
+                      <div className="mb-2">
+                        <span className="block text-xs font-semibold uppercase tracking-wide text-[#5C5C52] mb-1">Monitoramento</span>
+                        <div className="flex flex-wrap gap-2">
+                          {r.monitoramento.filter((m) => m.data).map((m, i) => (
+                            <span key={i} className="text-xs bg-[#F7F5F0] rounded px-2 py-1 text-[#5C5C52]">
+                              {fmtDate(m.data)}{m.peso ? ` · ${m.peso}g` : ""}{m.bcs ? ` · BCS ${m.bcs}` : ""}
+                              {m.observacoes ? ` · ${m.observacoes}` : ""}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {encerrado && (
+                      <p className="text-sm text-[#A6493C] mt-1 mb-2">
+                        <span className="font-medium">Encerramento ({fmtDate(r.data_encerramento)}):</span> {r.motivo_encerramento || "—"}
+                      </p>
+                    )}
+
+                    <div className="flex gap-1 mt-3">
+                      <Btn variant="ghost" onClick={() => setForm(r)} className="!px-2 !py-1 text-xs">Editar</Btn>
+                      <Btn variant="danger" onClick={() => excluir(r.id)} className="!px-2 !py-1 text-xs"><Trash2 size={13} /> Excluir</Btn>
+                    </div>
                   </div>
-                ) : (
-                  <p className="text-sm text-[#8A8574] mb-1">Nenhuma ninhada registrada ainda.</p>
                 )}
-
-                {r.genealogia && <p className="text-sm text-[#2B2B24]"><span className="font-medium">Genealogia:</span> {r.genealogia}</p>}
-                {r.historico_clinico && <p className="text-sm text-[#2B2B24]"><span className="font-medium">Histórico clínico:</span> {r.historico_clinico}</p>}
-                {r.intercorrencias && <p className="text-sm text-[#2B2B24]"><span className="font-medium">Intercorrências:</span> {r.intercorrencias}</p>}
-                {encerrado && <p className="text-sm text-[#A6493C] mt-1"><span className="font-medium">Encerramento ({fmtDate(r.data_encerramento)}):</span> {r.motivo_encerramento || "—"}</p>}
               </div>
             );
           })}
@@ -1126,6 +1203,7 @@ function SecaoForm({ titulo, children }) {
 
 function ModuloNecropsias({ necropsias, animais, reload, showToast }) {
   const [form, setForm] = useState(null);
+  const [aberto, setAberto] = useState(null);
 
   async function salvar(dados) {
     const id = dados.id || genId("necro");
@@ -1159,26 +1237,43 @@ function ModuloNecropsias({ necropsias, animais, reload, showToast }) {
         <div className="grid gap-2">
           {necropsias.map((r) => {
             const animal = animais.find((a) => a.sip === r.sip);
+            const isAberto = aberto === r.id;
             return (
               <div key={r.id} className="bg-white border border-[#E4E0D4] rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-3">
-                    <SipBadge sip={r.sip} linhagem={animal?.linhagem} />
-                    <span className="text-xs text-[#B5AF9E]">{fmtDate(r.data)}</span>
+                <button type="button" onClick={() => setAberto(isAberto ? null : r.id)} className="w-full text-left">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <SipBadge sip={r.sip} linhagem={animal?.linhagem} />
+                      <span className="text-xs text-[#B5AF9E]">{fmtDate(r.data)}</span>
+                    </div>
+                    <ChevronRight size={16} className={`text-[#B5AF9E] transition-transform ${isAberto ? "rotate-90" : ""}`} />
                   </div>
-                  <div className="flex gap-1">
-                    <Btn variant="ghost" onClick={() => setForm(r)} className="!px-2 !py-1 text-xs">Editar</Btn>
-                    <Btn variant="danger" onClick={() => excluir(r.id)} className="!px-2 !py-1 text-xs"><Trash2 size={13} /></Btn>
+                  <div className="flex gap-4 text-sm text-[#5C5C52] mb-1">
+                    <span>BCS: <strong className="text-[#2B2B24]">{r.bcs || "—"}</strong></span>
+                    <span>Cromodacriorreia: <strong className="text-[#2B2B24]">{r.cromodacriorreia ?? "—"}</strong></span>
+                    {r.condicao_carcaca && <span>Carcaça: <strong className="text-[#2B2B24]">{r.condicao_carcaca}</strong></span>}
                   </div>
-                </div>
-                <div className="flex gap-4 text-sm text-[#5C5C52] mb-1">
-                  <span>BCS: <strong className="text-[#2B2B24]">{r.bcs || "—"}</strong></span>
-                  <span>Cromodacriorreia: <strong className="text-[#2B2B24]">{r.cromodacriorreia ?? "—"}</strong></span>
-                  {r.condicao_carcaca && <span>Carcaça: <strong className="text-[#2B2B24]">{r.condicao_carcaca}</strong></span>}
-                </div>
-                <p className="text-sm text-[#2B2B24]"><span className="font-medium">Diagnóstico macroscópico:</span> {r.diagnostico_macroscopico || "—"}</p>
-                <p className="text-sm text-[#2B2B24]"><span className="font-medium">Diagnóstico final:</span> {r.diagnostico_final || "—"}</p>
-                {r.coletas && <p className="text-sm text-[#5C5C52]"><span className="font-medium">Coletas:</span> {r.coletas}</p>}
+                  <p className="text-sm text-[#2B2B24]"><span className="font-medium">Diagnóstico macroscópico:</span> {r.diagnostico_macroscopico || "—"}</p>
+                  <p className="text-sm text-[#2B2B24]"><span className="font-medium">Diagnóstico final:</span> {r.diagnostico_final || "—"}</p>
+                  {r.coletas && <p className="text-sm text-[#5C5C52]"><span className="font-medium">Coletas:</span> {r.coletas}</p>}
+                </button>
+
+                {isAberto && (
+                  <div className="mt-3 pt-3 border-t border-[#E4E0D4]">
+                    <DetalheCampo label="Responsável" valor={r.responsavel} />
+                    <DetalheCampo label="Histórico / motivo do óbito" valor={r.historico} />
+                    <DetalheCampo label="Avaliação externa" valor={r.avaliacao_externa} />
+                    {ACHADOS_SISTEMA.map((s) => (
+                      <DetalheCampo key={s.k} label={s.label} valor={r[s.k]} />
+                    ))}
+                    <DetalheCampo label="Exames enviados" valor={r.exames_enviados} />
+                    <DetalheCampo label="Destino do material" valor={r.destino} />
+                    <div className="flex gap-1 mt-3">
+                      <Btn variant="ghost" onClick={() => setForm(r)} className="!px-2 !py-1 text-xs">Editar</Btn>
+                      <Btn variant="danger" onClick={() => excluir(r.id)} className="!px-2 !py-1 text-xs"><Trash2 size={13} /> Excluir</Btn>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
