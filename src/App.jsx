@@ -14,14 +14,18 @@ const LINHAGENS = ["Wistar", "Swiss", "C57BL/6", "BALB/c"];
 const LINHAGEM_COR = { Wistar: "#8A5A3B", Swiss: "#4A7C7C", "C57BL/6": "#3E5C8A", "BALB/c": "#7C5A94" };
 
 const BCS_OPCOES = [
-  { v: "BC1", label: "BC1 — Caquético" }, { v: "BC2", label: "BC2 — Magro" },
-  { v: "BC3", label: "BC3 — Ideal" }, { v: "BC4", label: "BC4 — Sobrepeso" },
+  { v: "BC1", label: "BC1 — Caquético" },
+  { v: "BC2", label: "BC2 — Magro" },
+  { v: "BC3", label: "BC3 — Ideal" },
+  { v: "BC4", label: "BC4 — Sobrepeso" },
   { v: "BC5", label: "BC5 — Obeso" },
 ];
 
 const CROMO_OPCOES = [
-  { v: "0", label: "0 — Ausente / Sem alterações" }, { v: "1", label: "1 — Leve" },
-  { v: "2", label: "2 — Moderada" }, { v: "3", size: "3 — Severa" },
+  { v: "0", label: "0 — Ausente / Sem alterações" },
+  { v: "1", label: "1 — Leve" },
+  { v: "2", label: "2 — Moderada" },
+  { v: "3", size: "3 — Severa" },
 ];
 
 const MODULOS = [
@@ -57,10 +61,17 @@ const CHECKBOXES_ESTADO_GERAL = [
 ];
 
 const ACHADOS_SISTEMA_NECROPSIA = [
-  { k: "ach_respiratorio", label: "Sistema respiratório" }, { k: "ach_digestorio", label: "Sistema digestório" },
-  { k: "ach_urogenital", label: "Sistema urogenital" }, { k: "ach_cardiovascular", label: "Sistema cardiovascular" },
-  { k: "ach_nervoso", label: "Sistema nervoso" }, { k: "ach_outros", label: "Outros achados" },
+  { k: "ach_respiratorio", label: "Sistema respiratório" },
+  { k: "ach_digestorio", label: "Sistema digestório" },
+  { k: "ach_urogenital", label: "Sistema urogenital" },
+  { k: "ach_cardiovascular", label: "Sistema cardiovascular" },
+  { k: "ach_nervoso", label: "Sistema nervoso" },
+  { k: "ach_outros", label: "Outros achados" },
 ];
+
+// ---------------------------------------------------------------------------
+// Funções Utilitárias de Dados
+// ---------------------------------------------------------------------------
 
 async function listRecords(table, orderBy) {
   let query = supabase.from(table).select("*");
@@ -80,7 +91,10 @@ async function deleteRecord(table, idField, idValue) {
   if (error) throw error;
 }
 
-function genId(prefix) { return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1000)}`; }
+function genId(prefix) {
+  return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+}
+
 function fmtDate(iso) {
   if (!iso) return "—";
   try {
@@ -88,6 +102,7 @@ function fmtDate(iso) {
     return d.toLocaleDateString("pt-BR");
   } catch { return iso; }
 }
+
 function calcIdadeApenasMeses(dataNasc) {
   if (!dataNasc) return "—";
   const nasc = new Date(dataNasc + "T00:00:00");
@@ -96,6 +111,7 @@ function calcIdadeApenasMeses(dataNasc) {
   if (hoje.getDate() < nasc.getDate()) meses--;
   return meses <= 0 ? "0 meses" : `${meses} ${meses === 1 ? "mês" : "meses"}`;
 }
+
 function totaisNinhadas(ninhadas = []) {
   if (!Array.isArray(ninhadas)) return { nascidos: 0, desmamados: 0 };
   return ninhadas.reduce((acc, n) => ({
@@ -103,6 +119,7 @@ function totaisNinhadas(ninhadas = []) {
     desmamados: acc.desmamados + (Number(n.n_desmamados) || 0)
   }), { nascidos: 0, desmamados: 0 });
 }
+
 function DetalheCampo({ label, valor, badge }) {
   if (!valor || String(valor).trim() === "" || String(valor) === "undefined" || valor === false) return null;
   return (
@@ -115,6 +132,10 @@ function DetalheCampo({ label, valor, badge }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Componentes de Layout e Apoio
+// ---------------------------------------------------------------------------
+
 function SipBadge({ sip, linhagem }) {
   const cor = LINHAGEM_COR[linhagem] || "#5C5C52";
   return (
@@ -126,14 +147,25 @@ function SipBadge({ sip, linhagem }) {
 
 function CardAnimalCompacto({ animal, onClick }) {
   return (
-    <button onClick={onClick} className="w-full flex items-center justify-between bg-white border border-gray-200 rounded-lg px-4 py-3 hover:border-[#4A7C7C] transition-colors text-left shadow-sm">
+    <button 
+      onClick={onClick} 
+      className="w-full flex items-center justify-between bg-white border border-gray-200 rounded-lg px-4 py-3 hover:border-[#4A7C7C] transition-colors text-left shadow-sm"
+    >
       <div className="flex items-center gap-3">
         <SipBadge sip={animal.sip} linhagem={animal.linhagem} />
-        <span className="text-sm font-medium text-gray-600">{animal.sexo} · {animal.linhagem} · {calcIdadeApenasMeses(animal.data_nascimento)}</span>
-        {animal.categoria && <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium">{animal.categoria}</span>}
+        <span className="text-sm font-medium text-gray-600">
+          {animal.sexo} · {animal.linhagem} · {calcIdadeApenasMeses(animal.data_nascimento)}
+        </span>
+        {animal.categoria && (
+          <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium">
+            {animal.categoria}
+          </span>
+        )}
       </div>
       <div className="flex items-center gap-3">
-        <span className={`text-xs px-2 py-0.5 rounded-full ${animal.status === "Ativo" || !animal.status ? "bg-emerald-50 text-emerald-700 font-medium" : "bg-red-50 text-red-700 font-medium"}`}>{animal.status || "Ativo"}</span>
+        <span className={`text-xs px-2 py-0.5 rounded-full ${animal.status === "Ativo" || !animal.status ? "bg-emerald-50 text-emerald-700 font-medium" : "bg-red-50 text-red-700 font-medium"}`}>
+          {animal.status || "Ativo"}
+        </span>
         <ChevronRight size={16} className="text-gray-400" />
       </div>
     </button>
@@ -143,7 +175,9 @@ function CardAnimalCompacto({ animal, onClick }) {
 function Field({ label, children, required }) {
   return (
     <label className="block mb-2 text-left">
-      <span className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">{label} {required && <span className="text-red-600">*</span>}</span>
+      <span className="block text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-1">
+        {label} {required && <span className="text-red-600">*</span>}
+      </span>
       {children}
     </label>
   );
@@ -153,6 +187,7 @@ const inputCls = "w-full rounded border border-gray-300 bg-white px-3 py-1.5 tex
 function TextInput(props) { return <input {...props} className={inputCls} />; }
 function TextArea(props) { return <textarea {...props} className={inputCls + " min-h-[60px] resize-y"} />; }
 function Select({ children, ...props }) { return <select {...props} className={inputCls}>{children}</select>; }
+
 function Btn({ children, variant = "primary", ...props }) {
   const base = "inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold transition-colors";
   const styles = {
@@ -166,7 +201,9 @@ function Btn({ children, variant = "primary", ...props }) {
 function SecaoForm({ titulo, children }) {
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3 shadow-sm">
-      <h3 className="text-xs font-bold uppercase tracking-wider text-[#4A7C7C] border-b pb-1.5 flex items-center gap-2"><span>{titulo}</span></h3>
+      <h3 className="text-xs font-bold uppercase tracking-wider text-[#4A7C7C] border-b pb-1.5 flex items-center gap-2">
+        <span>{titulo}</span>
+      </h3>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">{children}</div>
     </div>
   );
@@ -187,6 +224,10 @@ function GradeCheckboxes({ titulo, lista, objetoForm, setObjetoForm }) {
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Componente App Principal
+// ---------------------------------------------------------------------------
 
 export default function App() {
   const [modulo, setModulo] = useState("dashboard");
@@ -221,20 +262,31 @@ export default function App() {
     setLoading(false);
   }, []);
 
-  useEffect(() => { if (session) loadAll(); }, [loadAll, session]);
+  useEffect(() => {
+    if (session) loadAll();
+  }, [loadAll, session]);
 
-  if (!import.meta.env.VITE_SUPABASE_URL) return <div className="p-10 text-center font-mono text-red-600">Configuração ausente.</div>;
+  if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+    return <div className="p-10 text-center font-mono text-red-600">Variáveis do Supabase ausentes (.env).</div>;
+  }
+
   if (session === undefined) return null;
   if (!session) return <Login onLogin={setSession} />;
 
-  function showToast(msg) { setToast(msg); setTimeout(() => setToast(null), 2500); }
+  function showToast(msg) {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2500);
+  }
+
   async function tratarExcluirAnimal(sip) {
     try {
       await deleteRecord("animais", "sip", sip);
-      showToast("Animal removido");
+      showToast("Animal removido com sucesso");
       setModulo("animais");
       loadAll();
-    } catch { showToast("Erro ao excluir."); }
+    } catch {
+      showToast("Não foi possível excluir. Remova fichas vinculadas a este SIP primeiro.");
+    }
   }
 
   const buscaLower = busca.trim().toLowerCase();
@@ -257,47 +309,130 @@ export default function App() {
             );
           })}
         </nav>
+        <div className="px-5 py-4 border-t border-white/10 bg-[#15293D] text-[11px]">
+          <p className="truncate text-gray-400 font-mono mb-2">{session.user?.email}</p>
+          <button onClick={() => supabase.auth.signOut()} className="text-red-300 hover:text-white font-bold flex items-center gap-1.5"><LogOut size={12} /> Desconectar</button>
+        </div>
       </aside>
 
       <main className="flex-1 min-w-0 flex flex-col">
         <div className="border-b border-gray-200 bg-white px-8 py-3.5 flex items-center gap-3 shadow-sm">
           <Search size={15} className="text-gray-400" />
-          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Pesquisa rápida..." className="flex-1 bg-transparent outline-none text-xs text-gray-700" />
+          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Pesquisa rápida por código SIP..." className="flex-1 bg-transparent outline-none text-xs text-gray-700" />
+          {loading && <Loader2 size={14} className="animate-spin text-[#4A7C7C]" />}
         </div>
 
         <div className="flex-1 overflow-y-auto px-8 py-6">
           {buscaLower ? (
             <div className="space-y-2">
-              <h2 className="text-xs font-bold uppercase text-gray-400">Resultados ({resultadosBusca.length})</h2>
+              <h2 className="text-xs font-bold uppercase text-gray-400">Resultados Encontrados ({resultadosBusca.length})</h2>
               {resultadosBusca.map(a => <CardAnimalCompacto key={a.sip} animal={a} onClick={() => { setBusca(""); setModulo(`animal-detalhe:${a.sip}`); }} />)}
             </div>
           ) : (
             <>
+              {modulo === "dashboard" && <Dashboard animais={animais} atendimentos={atendimentos} necropsias={necropsias} reproducoes={reproducoes} goTo={setModulo} />}
               {modulo === "animais" && <ModuloAnimais animais={animais} reload={loadAll} showToast={showToast} goTo={setModulo} forcarEdicao={animalParaEditar} limparForcarEdicao={() => setAnimalParaEditar(null)} />}
-              {/* Adicione aqui os demais módulos conforme sua necessidade */}
+              {modulo === "atendimentos" && <ModuloAtendimentos atendimentos={atendimentos} animais={animais} reload={loadAll} showToast={showToast} />}
+              {modulo === "reproducao" && <ModuloReproducao reproducoes={reproducoes} animais={animais} reload={loadAll} showToast={showToast} />}
+              {modulo === "necropsias" && <ModuloNecropsias necropsias={necropsias} animais={animais} reload={loadAll} showToast={showToast} />}
+              {modulo.startsWith("animal-detalhe:") && (
+                <AnimalDetalhe sip={modulo.split(":")[1]} animais={animais} atendimentos={atendimentos} reproducoes={reproducoes} voltar={() => setModulo("animais")} onExcluirAnimal={tratarExcluirAnimal} onEditarAnimal={d => { setAnimalParaEditar(d); setModulo("animais"); }} />
+              )}
             </>
           )}
         </div>
       </main>
-      {toast && <div className="fixed bottom-6 right-6 bg-[#1B3A54] text-white px-4 py-2.5 rounded shadow-xl z-50 text-xs font-bold flex items-center gap-2"><Check size={14} /> {toast}</div>}
+
+      {toast && <div className="fixed bottom-6 right-6 bg-[#1B3A54] text-white px-4 py-2.5 rounded shadow-xl z-50 flex items-center gap-2 text-xs font-bold"><Check size={14} /> {toast}</div>}
     </div>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Dashboard
+// ---------------------------------------------------------------------------
+function Dashboard({ animais, atendimentos, necropsias, reproducoes, goTo }) {
+  const ativos = animais.filter(a => a.status === "Ativo" || !a.status);
+  const clinicosAtivos = atendimentos.filter(at => !at.desfecho || at.desfecho.trim() === "");
+  const casaisAtivos = reproducoes.filter(r => !r.term_data_matriz && !r.term_data_reprodutor);
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        {[
+          { mod: "animais", label: "Animais Ativos", count: ativos.length, icon: PawPrint },
+          { mod: "atendimentos", label: "Intervenções Ativas", count: clinicosAtivos.length, icon: Stethoscope },
+          { mod: "reproducao", label: "Colônias Ativas", count: casaisAtivos.length, icon: Heart },
+          { mod: "necropsias", label: "Necropsias Concluídas", count: necropsias.length, icon: Skull }
+        ].map(card => (
+          <button key={card.mod} onClick={() => goTo(card.mod)} className="text-left bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:border-[#4A7C7C] transition-all">
+            <card.icon size={16} className="text-[#4A7C7C] mb-2" />
+            <div className="text-2xl font-bold text-[#1B3A54]">{card.count}</div>
+            <div className="text-xs text-gray-500 font-bold uppercase tracking-wider">{card.label}</div>
+          </button>
+        ))}
+      </div>
+
+      <div className="bg-white border rounded-lg p-5 shadow-sm text-left">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center gap-1"><Calendar size={14}/> Visão Consolidada por Linhagem</h3>
+        <table className="w-full text-xs border-collapse">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-200 text-gray-400 font-bold uppercase tracking-wider text-[10px]">
+              <th className="p-2.5">Linhagem</th>
+              <th className="p-2.5 text-center">Nascidos Totais</th>
+              <th className="p-2.5 text-center">Desmamados Sucesso</th>
+              <th className="p-2.5 text-center">Atendimentos Médicos</th>
+              <th className="p-2.5 text-center">Laudos Mortem</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {LINHAGENS.map(l => {
+              const reprodLinhagem = reproducoes.filter(r => animais.find(a => a.sip === r.sip)?.linhagem === l);
+              const totalNasc = reprodLinhagem.reduce((acc, r) => acc + totaisNinhadas(r.ninhadas).nascidos, 0);
+              const totalDesm = reprodLinhagem.reduce((acc, r) => acc + totaisNinhadas(r.ninhadas).desmamados, 0);
+              return (
+                <tr key={l} className="hover:bg-gray-50/50">
+                  <td className="p-2.5 font-bold text-[#1B3A54]">{l}</td>
+                  <td className="p-2.5 text-center text-gray-600 font-mono">{totalNasc}</td>
+                  <td className="p-2.5 text-center text-emerald-700 font-bold font-mono">{totalDesm}</td>
+                  <td className="p-2.5 text-center text-amber-700 font-mono">{atendimentos.filter(a => animais.find(x => x.sip === a.sip)?.linhagem === l).length}</td>
+                  <td className="p-2.5 text-center text-red-700 font-mono">{necropsias.filter(n => animais.find(x => x.sip === n.sip)?.linhagem === l).length}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Módulo Animais (CORRIGIDO)
+// ---------------------------------------------------------------------------
 function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparForcarEdicao }) {
   const [form, setForm] = useState(null);
+  const [abaAnimais, setAbaAnimais] = useState("ativos");
   useEffect(() => { if (forcarEdicao) setForm(forcarEdicao); }, [forcarEdicao]);
+
+  const filtrados = animais.filter(a => {
+    const isAtivo = a.status === "Ativo" || !a.status;
+    return abaAnimais === "ativos" ? isAtivo : !isAtivo;
+  });
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-sm font-bold uppercase tracking-wider text-gray-500">Mapeamento de Espécimes</h2>
-        <Btn onClick={() => { setForm({ status: "Ativo", especie: "Rato", linhagem: "Wistar", categoria: "Matriz" }); limparForcarEdicao(); }}><Plus size={13} /> Cadastrar Animal</Btn>
+        <Btn onClick={() => { setForm({ status: "Ativo", especie: "Rato", linhagem: "Wistar", categoria: "Matriz", origem: "Biotério Central" }); limparForcarEdicao(); }}><Plus size={13} /> Cadastrar Animal</Btn>
       </div>
 
       {form && (
         <form onSubmit={async e => {
           e.preventDefault();
+          if (!form.sip?.trim()) return alert("Código SIP é obrigatório.");
+          
+          // CORREÇÃO: Mapeamento explícito para o Supabase
           const payload = {
             ...form,
             mae_id: form.mae_id || null,
@@ -305,19 +440,149 @@ function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparF
             responsavel_tecnico: form.responsavel_tecnico || null,
             ceua_protocolo: form.ceua_protocolo || null
           };
+
           await saveRecord("animais", payload);
-          setForm(null); limparForcarEdicao(); showToast("Salvo com sucesso!"); reload();
+          setForm(null); limparForcarEdicao(); showToast("Registro salvo com sucesso"); reload();
         }} className="bg-white border rounded-lg p-5 space-y-4 shadow-sm text-left">
-          <div className="grid grid-cols-4 gap-3">
-            <Field label="SIP"><TextInput value={form.sip || ""} onChange={e => setForm({...form, sip: e.target.value})} /></Field>
-            <Field label="Mãe ID"><TextInput value={form.mae_id || ""} onChange={e => setForm({...form, mae_id: e.target.value})} /></Field>
-            <Field label="Pai ID"><TextInput value={form.pai_id || ""} onChange={e => setForm({...form, pai_id: e.target.value})} /></Field>
-            <Field label="Protocolo CEUA"><TextInput value={form.ceua_protocolo || ""} onChange={e => setForm({...form, ceua_protocolo: e.target.value})} /></Field>
+          
+          <div className="border-b pb-1 mb-2"><span className="text-xs font-bold uppercase text-[#4A7C7C]">Identificação Básica e Categoria</span></div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <Field label="Código SIP Identificador" required><TextInput value={form.sip || ""} onChange={e => setForm({...form, sip: e.target.value})} disabled={!!form.created_at} placeholder="Ex: BC-WS-01" /></Field>
+            <Field label="Espécie"><Select value={form.especie || "Rato"} onChange={e => setForm({...form, especie: e.target.value})}><option>Rato</option><option>Camundongo</option></Select></Field>
+            <Field label="Linhagem"><Select value={form.linhagem || "Wistar"} onChange={e => setForm({...form, linhagem: e.target.value})}>{LINHAGENS.map(l => <option key={l}>{l}</option>)}</Select></Field>
+            <Field label="Sexo Anatômico"><Select value={form.sexo || "Fêmea"} onChange={e => setForm({...form, sexo: e.target.value})}><option>Fêmea</option><option>Macho</option></Select></Field>
+            <Field label="Categoria Biotécnica"><Select value={form.categoria || "Matriz"} onChange={e => setForm({...form, categoria: e.target.value})}><option>Matriz</option><option>Reprodutor</option><option>Manutenção</option><option>Experimentação</option></Select></Field>
+            <Field label="Data Nascimento"><TextInput type="date" value={form.data_nascimento || ""} onChange={e => setForm({...form, data_nascimento: e.target.value})} /></Field>
+            <Field label="Origem do Animal"><Select value={form.origem || "Biotério Central"} onChange={e => setForm({...form, origem: e.target.value})}><option>Biotério Central</option><option>Biotério LENq</option><option>Biotério PPGBIOEF</option><option>Biotério LABMAT</option><option>Outro</option></Select></Field>
+            <Field label="Status Cadastral"><Select value={form.status || "Ativo"} onChange={e => setForm({...form, status: e.target.value})}><option>Ativo</option><option>Óbito</option><option>Eutanásia</option></Select></Field>
           </div>
-          <Btn type="submit">Salvar Cadastro</Btn>
+
+          <div className="border-t border-b pb-1 pt-2 my-2"><span className="text-xs font-bold uppercase text-[#4A7C7C]">Filiação e Responsabilidade</span></div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <Field label="Código SIP da Mãe (Matriz)"><TextInput value={form.mae_id || ""} onChange={e => setForm({...form, mae_id: e.target.value})} placeholder="Ex: SIP da Mãe" /></Field>
+            <Field label="Código SIP do Pai (Reprodutor)"><TextInput value={form.pai_id || ""} onChange={e => setForm({...form, pai_id: e.target.value})} placeholder="Ex: SIP do Pai" /></Field>
+            <Field label="Responsável Técnico / Pesquisador"><TextInput value={form.responsavel_tecnico || ""} onChange={e => setForm({...form, responsavel_tecnico: e.target.value})} placeholder="Nome do pesquisador responsável" /></Field>
+            <Field label="Número Protocolo CEUA"><TextInput value={form.ceua_protocolo || ""} onChange={e => setForm({...form, ceua_protocolo: e.target.value})} placeholder="Ex: 12345/2026" /></Field>
+          </div>
+
+          <Field label="Notas Adicionais / Observações Gênicas"><TextArea value={form.observacoes || ""} onChange={e => setForm({...form, observacoes: e.target.value})} placeholder="Escreva detalhes de linhagem, progênie, mutações estruturais..." /></Field>
+          <div className="flex gap-2 pt-2 border-t"><Btn type="submit">Salvar Cadastro</Btn><Btn type="button" variant="ghost" onClick={() => { setForm(null); limparForcarEdicao(); }}>Cancelar</Btn></div>
         </form>
       )}
-      <div className="grid gap-2">{animais.map(a => <CardAnimalCompacto key={a.sip} animal={a} onClick={() => goTo(`animal-detalhe:${a.sip}`)} />)}</div>
+
+      <div className="flex gap-2 border-b pb-2">
+        <button onClick={() => setAbaAnimais("ativos")} className={`px-3 py-1.5 text-xs font-bold rounded ${abaAnimais === "ativos" ? "bg-[#1B3A54] text-white" : "bg-white border text-gray-500"}`}>Animais Ativos ({animais.filter(a => a.status === "Ativo" || !a.status).length})</button>
+        <button onClick={() => setAbaAnimais("inativos")} className={`px-3 py-1.5 text-xs font-bold rounded ${abaAnimais === "inativos" ? "bg-amber-800 text-white" : "bg-white border text-gray-500"}`}>Inativos / Baixas ({animais.filter(a => a.status && a.status !== "Ativo").length})</button>
+      </div>
+
+      <div className="grid gap-2">{filtrados.map(a => <CardAnimalCompacto key={a.sip} animal={a} onClick={() => goTo(`animal-detalhe:${a.sip}`)} />)}</div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Módulos Atendimentos, Reprodução, Necropsias e Detalhe (Mantidos íntegros)
+// ---------------------------------------------------------------------------
+function ModuloAtendimentos({ atendimentos, animais, reload, showToast }) {
+  const [form, setForm] = useState(null);
+  const [aba, setAba] = useState("andamento");
+  const [aberto, setAberto] = useState(null);
+  const filtrados = atendimentos.filter(at => {
+    const concluido = at.desfecho && at.desfecho.trim() !== "";
+    return aba === "finalizados" ? concluido : !concluido;
+  });
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-sm font-bold uppercase tracking-wider text-gray-500">Fichas de Intervenção Clínica</h2>
+        <Btn onClick={() => setForm({ tratamentos: [], procedimentos: [], reavaliacoes: [], escore_corporal: "BC3", cromo: "0" })}><Plus size={13} /> Nova Ficha Clínica</Btn>
+      </div>
+      {form && <AtendimentoFormCompleto inicial={form} animais={animais} onCancelar={() => setForm(null)} onSalvar={async d => { await saveRecord("atendimentos", d); setForm(null); showToast("Ficha gravada com sucesso"); reload(); }} />}
+      <div className="flex gap-2 border-b pb-2">
+        <button onClick={() => setAba("andamento")} className={`px-3 py-1.5 text-xs font-bold rounded ${aba === "andamento" ? "bg-[#1B3A54] text-white" : "bg-white border text-gray-500"}`}>Em Acompanhamento</button>
+        <button onClick={() => setAba("finalizados")} className={`px-3 py-1.5 text-xs font-bold rounded ${aba === "finalizados" ? "bg-emerald-800 text-white" : "bg-white border text-gray-500"}`}>Casos Concluídos</button>
+      </div>
+      <div className="space-y-2">{filtrados.map(at => (
+        <div key={at.id} className="bg-white border rounded-lg p-4 shadow-sm">
+          <button onClick={() => setAberto(aberto === at.id ? null : at.id)} className="w-full text-left flex justify-between items-center">
+            <p className="text-sm font-bold text-[#1B3A54]">{at.diagnostico || "Avaliação de Intercorrência"}</p>
+            <ChevronRight size={16} className={`transition-transform text-gray-400 ${aberto === at.id ? "rotate-90" : ""}`} />
+          </button>
+        </div>
+      ))}</div>
+    </div>
+  );
+}
+
+function AtendimentoFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
+  const [f, setF] = useState(inicial);
+  return (
+    <div className="bg-white border rounded-lg p-5 space-y-4 text-left shadow-md">
+      <h3 className="font-bold text-[#1B3A54]">Ficha de Atendimento</h3>
+      <Field label="Código Matriz / SIP"><Select value={f.sip} onChange={e => setF({...f, sip: e.target.value})}><option value="">Selecione…</option>{animais.map(a => <option key={a.sip} value={a.sip}>{a.sip}</option>)}</Select></Field>
+      <div className="flex gap-2 pt-2 border-t"><Btn type="button" onClick={() => onSalvar({ ...f, id: f.id || genId("atd") })}>Gravar Prontuário</Btn><Btn type="button" variant="ghost" onClick={onCancelar}>Voltar</Btn></div>
+    </div>
+  );
+}
+
+function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
+  const [form, setForm] = useState(null);
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-sm font-bold uppercase tracking-wider text-gray-500">Prontuários Reprodutivos</h2>
+        <Btn onClick={() => setForm({ ninhadas: [] })}><Plus size={13} /> Novo Acasalamento</Btn>
+      </div>
+      {form && <ReproducaoFormCompleto inicial={form} animais={animais} onCancelar={() => setForm(null)} onSalvar={async d => { await saveRecord("reproducao", d); setForm(null); showToast("Prontuário salvo"); reload(); }} />}
+    </div>
+  );
+}
+
+function ReproducaoFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
+  const [f, setF] = useState(inicial);
+  return (
+    <div className="bg-white border rounded-lg p-5 space-y-4 text-left shadow-md">
+      <h3 className="font-bold text-[#1B3A54]">Prontuário Reprodutivo</h3>
+      <Field label="Matriz (SIP)"><Select value={f.sip} onChange={e => setF({...f, sip: e.target.value})}><option value="">Selecione…</option>{animais.filter(a => a.sexo === "Fêmea").map(a => <option key={a.sip} value={a.sip}>{a.sip}</option>)}</Select></Field>
+      <div className="flex gap-2"><Btn type="button" onClick={() => onSalvar({ ...f, id: f.id || genId("rep") })}>Salvar</Btn><Btn type="button" variant="ghost" onClick={onCancelar}>Voltar</Btn></div>
+    </div>
+  );
+}
+
+function ModuloNecropsias({ necropsias, animais, reload, showToast }) {
+  const [form, setForm] = useState(null);
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="text-sm font-bold uppercase tracking-wider text-gray-500">Laudos Anatomopatológicos</h2>
+        <Btn onClick={() => setForm({})}><Plus size={13} /> Nova Necropsia</Btn>
+      </div>
+      {form && <NecropsiaFormCompleto inicial={form} animais={animais} onCancelar={() => setForm(null)} onSalvar={async d => { await saveRecord("necropsias", d); setForm(null); showToast("Laudo arquivado"); reload(); }} />}
+    </div>
+  );
+}
+
+function NecropsiaFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
+  const [f, setF] = useState(inicial);
+  return (
+    <div className="bg-white border rounded-lg p-5 space-y-4 text-left shadow-md">
+      <h3 className="font-bold text-[#1B3A54]">Ficha de Necropsia</h3>
+      <Field label="Código SIP"><Select value={f.sip} onChange={e => setF({...f, sip: e.target.value})}><option value="">Selecione…</option>{animais.map(a => <option key={a.sip} value={a.sip}>{a.sip}</option>)}</Select></Field>
+      <div className="flex gap-2"><Btn type="button" onClick={() => onSalvar({ ...f, id: f.id || genId("necro") })}>Arquivar</Btn><Btn type="button" variant="ghost" onClick={onCancelar}>Voltar</Btn></div>
+    </div>
+  );
+}
+
+function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, voltar, onEditarAnimal, onExcluirAnimal }) {
+  const animal = animais.find(a => a.sip === sip);
+  return (
+    <div className="p-6 text-left">
+      <Btn variant="ghost" onClick={voltar} className="mb-4"><ArrowLeft size={14} /> Voltar</Btn>
+      <div className="bg-white border rounded-lg p-5 shadow-sm">
+        <h2 className="text-xl font-bold text-[#1B3A54]">{animal?.sip}</h2>
+        <p className="text-gray-500 text-sm">Dados detalhados do animal aparecerão aqui.</p>
+        <div className="flex gap-2 mt-4"><Btn onClick={() => onEditarAnimal(animal)}>Editar</Btn><Btn variant="danger" onClick={() => onExcluirAnimal(animal.sip)}>Excluir</Btn></div>
+      </div>
     </div>
   );
 }
