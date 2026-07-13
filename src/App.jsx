@@ -408,13 +408,12 @@ function Dashboard({ animais, atendimentos, necropsias, reproducoes, goTo }) {
 }
 
 // ---------------------------------------------------------------------------
-// Módulo Animais (Com Alertas de Validação CEUA no Envio)
+// Módulo Animais (Com Diagnóstico Detalhado do Banco)
 // ---------------------------------------------------------------------------
 function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparForcarEdicao }) {
   const [form, setForm] = useState(null);
   const [abaAnimais, setAbaAnimais] = useState("ativos");
 
-  // Garante que o formulário de edição inicialize corretamente com strings limpas
   useEffect(() => { 
     if (forcarEdicao) {
       setForm({
@@ -448,20 +447,34 @@ function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparF
             return;
           }
           
-          // Alerta Visual: Se for Experimentação, o Protocolo CEUA passa a ser OBRIGATÓRIO
           if (form.categoria === "Experimentação" && !form.protocolo_ceua?.trim()) {
             alert("Atenção Lara! Animais na categoria de 'Experimentação' exigem obrigatoriamente o preenchimento do Número do Protocolo CEUA.");
             return;
           }
 
+          // Prepara objeto limpando strings vazias para enviar nulo válido ao banco
+          const payload = {
+            ...form,
+            mae_id: form.mae_id?.trim() || null,
+            pai_id: form.pai_id?.trim() || null,
+            responsavel_tecnico: form.responsavel_tecnico?.trim() || null,
+            protocolo_ceua: form.protocolo_ceua?.trim() || null,
+            origem: form.origem || "Biotério Central"
+          };
+
           try {
-            await saveRecord("animais", form);
+            const { error } = await supabase.from("animais").upsert(payload);
+            if (error) {
+              // Exibe o erro exato retornado pela tabela do Supabase
+              alert(`Erro no Banco do Supabase:\nCódigo: ${error.code}\nMensagem: ${error.message}\n\nDica: Verifique se as colunas mae_id, pai_id, origem, responsavel_tecnico ou protocolo_ceua existem exatamente com esses nomes minúsculos na estrutura da sua tabela.`);
+              return;
+            }
             setForm(null); 
             limparForcarEdicao(); 
             showToast("Registro salvo com sucesso"); 
             reload();
           } catch (err) {
-            alert("Erro ao comunicar com o banco de dados. Verifique a conexão.");
+            alert("Falha crítica local na execução do formulário.");
           }
         }} className="bg-white border rounded-lg p-5 space-y-4 shadow-sm text-left">
           
@@ -524,7 +537,7 @@ function ModuloAtendimentos({ atendimentos, animais, reload, showToast }) {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-gray-500">Fichas de Intervenção Clinical</h2>
+        <h2 className="text-sm font-bold uppercase tracking-wider text-gray-500">Fichas de Intervenção Clínica</h2>
         <Btn onClick={() => setForm({
           tratamentos: [], procedimentos: [], reavaliacoes: [],
           escore_corporal: "BC3", cromo: "0"
@@ -977,7 +990,6 @@ function NecropsiaFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
 // ---------------------------------------------------------------------------
 // Perfil Consolidado (Animal Perfil)
 // ---------------------------------------------------------------------------
-// ... [O restante do arquivo permanece igual e protegido]
 function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, voltar, onEditarAnimal, onExcluirAnimal }) {
   const animal = animais.find(a => a.sip === sip);
   if (!animal) return <p className="text-sm p-6 text-gray-400">Animal não localizado no banco central.</p>;
