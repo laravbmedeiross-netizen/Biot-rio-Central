@@ -25,7 +25,7 @@ const CROMO_OPCOES = [
   { v: "0", label: "0 — Ausente / Sem alterações" },
   { v: "1", label: "1 — Leve" },
   { v: "2", label: "2 — Moderada" },
-  { v: "3", size: "3 — Severa" },
+  { v: "3", label: "3 — Severa" },
 ];
 
 const MODULOS = [
