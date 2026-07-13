@@ -132,6 +132,10 @@ function DetalheCampo({ label, valor, badge }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Componentes de Layout e Apoio
+// ---------------------------------------------------------------------------
+
 function SipBadge({ sip, linhagem }) {
   const cor = LINHAGEM_COR[linhagem] || "#5C5C52";
   return (
@@ -345,7 +349,66 @@ export default function App() {
 }
 
 // ---------------------------------------------------------------------------
-// Módulo Animais (Com Separação de Ativos/Inativos)
+// Dashboard
+// ---------------------------------------------------------------------------
+function Dashboard({ animais, atendimentos, necropsias, reproducoes, goTo }) {
+  const ativos = animais.filter(a => a.status === "Ativo" || !a.status);
+  const clinicosAtivos = atendimentos.filter(at => !at.desfecho || at.desfecho.trim() === "");
+  const casaisAtivos = reproducoes.filter(r => !r.term_data_matriz && !r.term_data_reprodutor);
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        {[
+          { mod: "animais", label: "Animais Ativos", count: ativos.length, icon: PawPrint },
+          { mod: "atendimentos", label: "Intervenções Ativas", count: clinicosAtivos.length, icon: Stethoscope },
+          { mod: "reproducao", label: "Colônias Ativas", count: casaisAtivos.length, icon: Heart },
+          { mod: "necropsias", label: "Necropsias Concluídas", count: necropsias.length, icon: Skull }
+        ].map(card => (
+          <button key={card.mod} onClick={() => goTo(card.mod)} className="text-left bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:border-[#4A7C7C] transition-all">
+            <card.icon size={16} className="text-[#4A7C7C] mb-2" />
+            <div className="text-2xl font-bold text-[#1B3A54]">{card.count}</div>
+            <div className="text-xs text-gray-500 font-bold uppercase tracking-wider">{card.label}</div>
+          </button>
+        ))}
+      </div>
+
+      <div className="bg-white border rounded-lg p-5 shadow-sm text-left">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center gap-1"><Calendar size={14}/> Visão Consolidada por Linhagem</h3>
+        <table className="w-full text-xs border-collapse">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-200 text-gray-400 font-bold uppercase tracking-wider text-[10px]">
+              <th className="p-2.5">Linhagem</th>
+              <th className="p-2.5 text-center">Nascidos Totais</th>
+              <th className="p-2.5 text-center">Desmamados Sucesso</th>
+              <th className="p-2.5 text-center">Atendimentos Médicos</th>
+              <th className="p-2.5 text-center">Laudos Mortem</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {LINHAGENS.map(l => {
+              const reprodLinhagem = reproducoes.filter(r => animais.find(a => a.sip === r.sip)?.linhagem === l);
+              const totalNasc = reprodLinhagem.reduce((acc, r) => acc + totaisNinhadas(r.ninhadas).nascidos, 0);
+              const totalDesm = reprodLinhagem.reduce((acc, r) => acc + totaisNinhadas(r.ninhadas).desmamados, 0);
+              return (
+                <tr key={l} className="hover:bg-gray-50/50">
+                  <td className="p-2.5 font-bold text-[#1B3A54]">{l}</td>
+                  <td className="p-2.5 text-center text-gray-600 font-mono">{totalNasc}</td>
+                  <td className="p-2.5 text-center text-emerald-700 font-bold font-mono">{totalDesm}</td>
+                  <td className="p-2.5 text-center text-amber-700 font-mono">{atendimentos.filter(a => animais.find(x => x.sip === a.sip)?.linhagem === l).length}</td>
+                  <td className="p-2.5 text-center text-red-700 font-mono">{necropsias.filter(n => animais.find(x => x.sip === n.sip)?.linhagem === l).length}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Módulo Animais
 // ---------------------------------------------------------------------------
 function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparForcarEdicao }) {
   const [form, setForm] = useState(null);
@@ -378,10 +441,10 @@ function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparF
             <Field label="Sexo Anatômico"><Select value={form.sexo || "Fêmea"} onChange={e => setForm({...form, sexo: e.target.value})}><option>Fêmea</option><option>Macho</option></Select></Field>
             <Field label="Categoria Biotécnica"><Select value={form.categoria || "Matriz"} onChange={e => setForm({...form, categoria: e.target.value})}><option>Matriz</option><option>Reprodutor</option><option>Manutenção</option><option>Experimentação</option></Select></Field>
             <Field label="Data Nascimento"><TextInput type="date" value={form.data_nascimento || ""} onChange={e => setForm({...form, data_nascimento: e.target.value})} /></Field>
-            <Field label="Origem do Animal"><TextInput value={form.origem || ""} onChange={e => setForm({...form, origem: e.target.value})} placeholder="Ex: Maternidade Interna, Outra Instituição" /></Field>
+            <Field label="Origem do Animal"><TextInput value={form.origem || ""} onChange={e => setForm({...form, origem: e.target.value})} placeholder="Ex: Maternidade Interna" /></Field>
             <Field label="Status Cadastral"><Select value={form.status || "Ativo"} onChange={e => setForm({...form, status: e.target.value})}><option>Ativo</option><option>Óbito</option><option>Eutanásia</option></Select></Field>
           </div>
-          <Field label="Notas Adicionais / Observações Gênicas"><TextArea value={form.observacoes || ""} onChange={e => setForm({...form, observacoes: e.target.value})} placeholder="Escreva observações genéticas, mutações ou detalhes de progênie..." /></Field>
+          <Field label="Notas Adicionais / Observações Gênicas"><TextArea value={form.observacoes || ""} onChange={e => setForm({...form, observacoes: e.target.value})} placeholder="Escreva detalhes de linhagem, progênie, etc..." /></Field>
           <div className="flex gap-2"><Btn type="submit">Salvar Cadastro</Btn><Btn type="button" variant="ghost" onClick={() => { setForm(null); limparForcarEdicao(); }}>Cancelar</Btn></div>
         </form>
       )}
@@ -397,7 +460,7 @@ function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparF
 }
 
 // ---------------------------------------------------------------------------
-// Módulo Atendimentos (Intervenção Clínica)
+// Módulo Atendimentos
 // ---------------------------------------------------------------------------
 function ModuloAtendimentos({ atendimentos, animais, reload, showToast }) {
   const [form, setForm] = useState(null);
@@ -472,7 +535,6 @@ function ModuloAtendimentos({ atendimentos, animais, reload, showToast }) {
                   <DetalheCampo label="Anotações / Descrição" valor={at.descricao_atendimento} />
                   <DetalheCampo label="Desfecho / Data Fechamento" valor={at.desfecho ? `${at.desfecho} (Em ${fmtDate(at.data_desfecho)})` : null} />
 
-                  {/* Subtabelas Clínicas Blindadas Contra Travamento */}
                   {Array.isArray(at.tratamentos) && at.tratamentos.length > 0 && (
                     <div className="border rounded-md overflow-hidden text-xs bg-white shadow-inner">
                       <div className="bg-gray-100 p-2 font-bold text-gray-600 border-b">Tratamento Instituído</div>
@@ -595,14 +657,13 @@ function AtendimentoFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
 }
 
 // ---------------------------------------------------------------------------
-// Módulo Reprodução (Separação Absoluta Ativos/Inativos)
+// Módulo Reprodução
 // ---------------------------------------------------------------------------
 function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
   const [form, setForm] = useState(null);
   const [aba, setAba] = useState("ativos");
   const [aberto, setAberto] = useState(null);
 
-  // Filtro estrito corrigido para evitar falhas de leitura
   const filtrados = reproducoes.filter(r => {
     const enc = (r.term_data_matriz && r.term_data_matriz.trim() !== "") || (r.term_data_reprodutor && r.term_data_reprodutor.trim() !== "");
     return aba === "inativos" ? enc : !enc;
