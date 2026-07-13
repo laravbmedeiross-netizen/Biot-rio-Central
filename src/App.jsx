@@ -7,7 +7,7 @@ import { supabase } from "./supabaseClient";
 import Login from "./Login";
 
 // ---------------------------------------------------------------------------
-// Constantes Temáticas e Opções dos Formulários Oficiais (CB-UFRN)
+// Constantes de Domínio Oficial (CB - UFRN)
 // ---------------------------------------------------------------------------
 
 const LINHAGENS = ["Wistar", "Swiss", "C57BL/6", "BALB/c"];
@@ -70,7 +70,7 @@ const ACHADOS_SISTEMA_NECROPSIA = [
 ];
 
 // ---------------------------------------------------------------------------
-// Funções Utilitárias e Operações de Banco de Dados
+// Funções Utilitárias de Dados
 // ---------------------------------------------------------------------------
 
 async function listRecords(table, orderBy) {
@@ -159,7 +159,7 @@ function CardAnimalCompacto({ animal, onClick }) {
         )}
       </div>
       <div className="flex items-center gap-3">
-        <span className={`text-xs px-2 py-0.5 rounded-full ${animal.status === "Ativo" ? "bg-emerald-50 text-emerald-700 font-medium" : "bg-red-50 text-red-700 font-medium"}`}>
+        <span className={`text-xs px-2 py-0.5 rounded-full ${animal.status === "Ativo" || !animal.status ? "bg-emerald-50 text-emerald-700 font-medium" : "bg-red-50 text-red-700 font-medium"}`}>
           {animal.status || "Ativo"}
         </span>
         <ChevronRight size={16} className="text-gray-400" />
@@ -222,7 +222,7 @@ function GradeCheckboxes({ titulo, lista, objetoForm, setObjetoForm }) {
 }
 
 // ---------------------------------------------------------------------------
-// Componente Principal (App)
+// Componente App Principal
 // ---------------------------------------------------------------------------
 
 export default function App() {
@@ -345,98 +345,53 @@ export default function App() {
 }
 
 // ---------------------------------------------------------------------------
-// Dashboard
-// ---------------------------------------------------------------------------
-function Dashboard({ animais, atendimentos, necropsias, reproducoes, goTo }) {
-  const ativos = animais.filter(a => a.status === "Ativo" || !a.status);
-  const clinicosAtivos = atendimentos.filter(at => !at.desfecho || at.desfecho.trim() === "");
-  const casaisAtivos = reproducoes.filter(r => !r.term_data_matriz && !r.term_data_reprodutor);
-
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        {[
-          { mod: "animais", label: "Animais Ativos", count: ativos.length, icon: PawPrint },
-          { mod: "atendimentos", label: "Intervenções Ativas", count: clinicosAtivos.length, icon: Stethoscope },
-          { mod: "reproducao", label: "Colônias Ativas", count: casaisAtivos.length, icon: Heart },
-          { mod: "necropsias", label: "Necropsias Concluídas", count: necropsias.length, icon: Skull }
-        ].map(card => (
-          <button key={card.mod} onClick={() => goTo(card.mod)} className="text-left bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:border-[#4A7C7C] transition-all">
-            <card.icon size={16} className="text-[#4A7C7C] mb-2" />
-            <div className="text-2xl font-bold text-[#1B3A54]">{card.count}</div>
-            <div className="text-xs text-gray-500 font-bold uppercase tracking-wider">{card.label}</div>
-          </button>
-        ))}
-      </div>
-
-      <div className="bg-white border rounded-lg p-5 shadow-sm text-left">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center gap-1"><Calendar size={14}/> Visão Consolidada por Linhagem</h3>
-        <table className="w-full text-xs border-collapse">
-          <thead>
-            <tr className="bg-gray-50 border-b border-gray-200 text-gray-400 font-bold uppercase tracking-wider text-[10px]">
-              <th className="p-2.5">Linhagem</th>
-              <th className="p-2.5 text-center">Nascidos Totais</th>
-              <th className="p-2.5 text-center">Desmamados Sucesso</th>
-              <th className="p-2.5 text-center">Atendimentos Médicos</th>
-              <th className="p-2.5 text-center">Laudos Mortem</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {LINHAGENS.map(l => {
-              const reprodLinhagem = reproducoes.filter(r => animais.find(a => a.sip === r.sip)?.linhagem === l);
-              const totalNasc = reprodLinhagem.reduce((acc, r) => acc + totaisNinhadas(r.ninhadas).nascidos, 0);
-              const totalDesm = reprodLinhagem.reduce((acc, r) => acc + totaisNinhadas(r.ninhadas).desmamados, 0);
-              return (
-                <tr key={l} className="hover:bg-gray-50/50">
-                  <td className="p-2.5 font-bold text-[#1B3A54]">{l}</td>
-                  <td className="p-2.5 text-center text-gray-600 font-mono">{totalNasc}</td>
-                  <td className="p-2.5 text-center text-emerald-700 font-bold font-mono">{totalDesm}</td>
-                  <td className="p-2.5 text-center text-amber-700 font-mono">{atendimentos.filter(a => animais.find(x => x.sip === a.sip)?.linhagem === l).length}</td>
-                  <td className="p-2.5 text-center text-red-700 font-mono">{necropsias.filter(n => animais.find(x => x.sip === n.sip)?.linhagem === l).length}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Módulo Animais
+// Módulo Animais (Com Separação de Ativos/Inativos)
 // ---------------------------------------------------------------------------
 function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparForcarEdicao }) {
   const [form, setForm] = useState(null);
+  const [abaAnimais, setAbaAnimais] = useState("ativos");
   useEffect(() => { if (forcarEdicao) setForm(forcarEdicao); }, [forcarEdicao]);
+
+  const filtrados = animais.filter(a => {
+    const isAtivo = a.status === "Ativo" || !a.status;
+    return abaAnimais === "ativos" ? isAtivo : !isAtivo;
+  });
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-gray-500">Mapeamento de Especimes (SIP)</h2>
-        <Btn onClick={() => { setForm({}); limparForcarEdicao(); }}><Plus size={13} /> Cadastrar Animal</Btn>
+        <h2 className="text-sm font-bold uppercase tracking-wider text-gray-500">Mapeamento de Espécimes</h2>
+        <Btn onClick={() => { setForm({ status: "Ativo", especie: "Rato", linhagem: "Wistar", categoria: "Matriz" }); limparForcarEdicao(); }}><Plus size={13} /> Cadastrar Animal</Btn>
       </div>
+
       {form && (
         <form onSubmit={async e => {
           e.preventDefault();
           if (!form.sip?.trim()) return alert("Código SIP é obrigatório.");
           await saveRecord("animais", form);
-          setForm(null); limparForcarEdicao(); showToast("Registro salvo"); reload();
+          setForm(null); limparForcarEdicao(); showToast("Registro salvo com sucesso"); reload();
         }} className="bg-white border rounded-lg p-4 space-y-4 shadow-sm">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <Field label="Código SIP Identificador" required><TextInput value={form.sip || ""} onChange={e => setForm({...form, sip: e.target.value})} disabled={!!form.created_at} /></Field>
+            <Field label="Código SIP Identificador" required><TextInput value={form.sip || ""} onChange={e => setForm({...form, sip: e.target.value})} disabled={!!form.created_at} placeholder="Ex: BC-WS-01" /></Field>
             <Field label="Espécie"><Select value={form.especie || "Rato"} onChange={e => setForm({...form, especie: e.target.value})}><option>Rato</option><option>Camundongo</option></Select></Field>
             <Field label="Linhagem"><Select value={form.linhagem || "Wistar"} onChange={e => setForm({...form, linhagem: e.target.value})}>{LINHAGENS.map(l => <option key={l}>{l}</option>)}</Select></Field>
             <Field label="Sexo Anatômico"><Select value={form.sexo || "Fêmea"} onChange={e => setForm({...form, sexo: e.target.value})}><option>Fêmea</option><option>Macho</option></Select></Field>
             <Field label="Categoria Biotécnica"><Select value={form.categoria || "Matriz"} onChange={e => setForm({...form, categoria: e.target.value})}><option>Matriz</option><option>Reprodutor</option><option>Manutenção</option><option>Experimentação</option></Select></Field>
             <Field label="Data Nascimento"><TextInput type="date" value={form.data_nascimento || ""} onChange={e => setForm({...form, data_nascimento: e.target.value})} /></Field>
+            <Field label="Origem do Animal"><TextInput value={form.origem || ""} onChange={e => setForm({...form, origem: e.target.value})} placeholder="Ex: Maternidade Interna, Outra Instituição" /></Field>
             <Field label="Status Cadastral"><Select value={form.status || "Ativo"} onChange={e => setForm({...form, status: e.target.value})}><option>Ativo</option><option>Óbito</option><option>Eutanásia</option></Select></Field>
           </div>
-          <Field label="Anotações Complementares"><TextArea value={form.observacoes || ""} onChange={e => setForm({...form, observacoes: e.target.value})} /></Field>
+          <Field label="Notas Adicionais / Observações Gênicas"><TextArea value={form.observacoes || ""} onChange={e => setForm({...form, observacoes: e.target.value})} placeholder="Escreva observações genéticas, mutações ou detalhes de progênie..." /></Field>
           <div className="flex gap-2"><Btn type="submit">Salvar Cadastro</Btn><Btn type="button" variant="ghost" onClick={() => { setForm(null); limparForcarEdicao(); }}>Cancelar</Btn></div>
         </form>
       )}
-      <div className="grid gap-2">{animais.map(a => <CardAnimalCompacto key={a.sip} animal={a} onClick={() => goTo(`animal-detalhe:${a.sip}`)} />)}</div>
+
+      <div className="flex gap-2 border-b pb-2">
+        <button onClick={() => setAbaAnimais("ativos")} className={`px-3 py-1.5 text-xs font-bold rounded ${abaAnimais === "ativos" ? "bg-[#1B3A54] text-white" : "bg-white border text-gray-500"}`}>Animais Ativos ({animais.filter(a => a.status === "Ativo" || !a.status).length})</button>
+        <button onClick={() => setAbaAnimais("inativos")} className={`px-3 py-1.5 text-xs font-bold rounded ${abaAnimais === "inativos" ? "bg-amber-800 text-white" : "bg-white border text-gray-500"}`}>Inativos / Baixas ({animais.filter(a => a.status && a.status !== "Ativo").length})</button>
+      </div>
+
+      <div className="grid gap-2">{filtrados.map(a => <CardAnimalCompacto key={a.sip} animal={a} onClick={() => goTo(`animal-detalhe:${a.sip}`)} />)}</div>
     </div>
   );
 }
@@ -466,84 +421,87 @@ function ModuloAtendimentos({ atendimentos, animais, reload, showToast }) {
 
       {form && (
         <AtendimentoFormCompleto inicial={form} animais={animais} onCancelar={() => setForm(null)} onSalvar={async d => {
-          await saveRecord("atendimentos", d); setForm(null); showToast("Ficha gravada"); reload();
+          await saveRecord("atendimentos", d); setForm(null); showToast("Ficha gravada com sucesso"); reload();
         }} />
       )}
 
       <div className="flex gap-2 border-b pb-2">
         <button onClick={() => setAba("andamento")} className={`px-3 py-1.5 text-xs font-bold rounded ${aba === "andamento" ? "bg-[#1B3A54] text-white" : "bg-white border text-gray-500"}`}>Em Acompanhamento ({atendimentos.filter(at => !at.desfecho || at.desfecho.trim() === "").length})</button>
-        <button onClick={() => setAba("finalizados")} className={`px-3 py-1.5 text-xs font-bold rounded ${aba === "finalizados" ? "bg-emerald-800 text-white" : "bg-white border text-gray-500"}`}>Desfechos Concluídos ({atendimentos.filter(at => at.desfecho && at.desfecho.trim() !== "").length})</button>
+        <button onClick={() => setAba("finalizados")} className={`px-3 py-1.5 text-xs font-bold rounded ${aba === "finalizados" ? "bg-emerald-800 text-white" : "bg-white border text-gray-500"}`}>Casos Concluídos ({atendimentos.filter(at => at.desfecho && at.desfecho.trim() !== "").length})</button>
       </div>
 
       <div className="space-y-2">
-        {filtrados.map(at => (
-          <div key={at.id} className="bg-white border rounded-lg p-4 shadow-sm">
-            <button onClick={() => setAberto(aberto === at.id ? null : at.id)} className="w-full text-left flex justify-between items-center">
-              <div>
-                <div className="flex items-center gap-2"><SipBadge sip={at.sip} /><span className="text-xs text-gray-400">{fmtDate(at.data)} · Responsável: {at.responsavel || "—"}</span></div>
-                <p className="text-sm font-bold text-[#1B3A54] mt-1">{at.diagnostico || "Avaliação de Intercorrência"}</p>
-              </div>
-              <ChevronRight size={16} className={`transition-transform text-gray-400 ${aberto === at.id ? "rotate-90" : ""}`} />
-            </button>
-
-            {aberto === at.id && (
-              <div className="mt-4 pt-4 border-t space-y-3 text-left">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                  <DetalheCampo label="Motivo do Chamado" valor={at.motivo_chamado} />
-                  <DetalheCampo label="Escore ECC/BCS" valor={at.escore_corporal} />
-                  <DetalheCampo label="Cromodacriorreia" valor={at.cromo ? `Grau ${at.cromo}` : "—"} />
-                  <DetalheCampo label="Peso Atual" valor={at.peso ? `${at.peso}g` : "—"} />
+        {filtrados.map(at => {
+          const animal = animais.find(a => a.sip === at.sip);
+          return (
+            <div key={at.id} className="bg-white border rounded-lg p-4 shadow-sm">
+              <button onClick={() => setAberto(aberto === at.id ? null : at.id)} className="w-full text-left flex justify-between items-center">
+                <div>
+                  <div className="flex items-center gap-2"><SipBadge sip={at.sip} linhagem={animal?.linhagem} /><span className="text-xs text-gray-400">{fmtDate(at.data)} · Responsável: {at.responsavel || "—"}</span></div>
+                  <p className="text-sm font-bold text-[#1B3A54] mt-1">{at.diagnostico || "Avaliação de Intercorrência"}</p>
                 </div>
+                <ChevronRight size={16} className={`transition-transform text-gray-400 ${aberto === at.id ? "rotate-90" : ""}`} />
+              </button>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                  <div className="bg-gray-50 p-2 rounded border border-gray-100 text-xs">
-                    <span className="block font-bold uppercase text-[9px] text-gray-400 mb-1">Pele e Pelagem</span>
-                    {CHECKBOXES_PELE_PELAGEM.filter(c => at[c.k]).map(c => c.label).join(", ") || "Sem alterações"}
+              {aberto === at.id && (
+                <div className="mt-4 pt-4 border-t space-y-3 text-left">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <DetalheCampo label="Motivo do Chamado" valor={at.motivo_chamado} />
+                    <DetalheCampo label="Escore ECC/BCS" valor={at.escore_corporal} />
+                    <DetalheCampo label="Cromodacriorreia" valor={at.cromo ? `Grau ${at.cromo}` : "—"} />
+                    <DetalheCampo label="Peso Atual" valor={at.peso ? `${at.peso}g` : "—"} />
                   </div>
-                  <div className="bg-gray-50 p-2 rounded border border-gray-100 text-xs">
-                    <span className="block font-bold uppercase text-[9px] text-gray-400 mb-1">Região Perineal</span>
-                    {CHECKBOXES_PERINEAL.filter(c => at[c.k]).map(c => c.label).join(", ") || "Sem alterações"}
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <div className="bg-gray-50 p-2 rounded border border-gray-100 text-xs">
+                      <span className="block font-bold uppercase text-[9px] text-gray-400 mb-1">Pele e Pelagem</span>
+                      {CHECKBOXES_PELE_PELAGEM.filter(c => at[c.k]).map(c => c.label).join(", ") || "Sem alterações"}
+                    </div>
+                    <div className="bg-gray-50 p-2 rounded border border-gray-100 text-xs">
+                      <span className="block font-bold uppercase text-[9px] text-gray-400 mb-1">Região Perineal</span>
+                      {CHECKBOXES_PERINEAL.filter(c => at[c.k]).map(c => c.label).join(", ") || "Sem alterações"}
+                    </div>
+                    <div className="bg-gray-50 p-2 rounded border border-gray-100 text-xs">
+                      <span className="block font-bold uppercase text-[9px] text-gray-400 mb-1">Estado Geral</span>
+                      {CHECKBOXES_ESTADO_GERAL.filter(c => at[c.k]).map(c => c.label).join(", ") || "Sem alterações"}
+                    </div>
                   </div>
-                  <div className="bg-gray-50 p-2 rounded border border-gray-100 text-xs">
-                    <span className="block font-bold uppercase text-[9px] text-gray-400 mb-1">Estado Geral</span>
-                    {CHECKBOXES_ESTADO_GERAL.filter(c => at[c.k]).map(c => c.label).join(", ") || "Sem alterações"}
+
+                  <DetalheCampo label="Hipótese Diagnóstica" valor={at.diagnostico} />
+                  <DetalheCampo label="Conduta Adotada" valor={at.conduta_adotada} />
+                  <DetalheCampo label="Anotações / Descrição" valor={at.descricao_atendimento} />
+                  <DetalheCampo label="Desfecho / Data Fechamento" valor={at.desfecho ? `${at.desfecho} (Em ${fmtDate(at.data_desfecho)})` : null} />
+
+                  {/* Subtabelas Clínicas Blindadas Contra Travamento */}
+                  {Array.isArray(at.tratamentos) && at.tratamentos.length > 0 && (
+                    <div className="border rounded-md overflow-hidden text-xs bg-white shadow-inner">
+                      <div className="bg-gray-100 p-2 font-bold text-gray-600 border-b">Tratamento Instituído</div>
+                      <table className="w-full text-left">
+                        <thead><tr className="bg-gray-50/50 border-b text-gray-400 font-bold text-[10px]"><th className="p-1.5">Data</th><th className="p-1.5">Medicamento</th><th className="p-1.5">Dose</th><th className="p-1.5">Via/Freq</th></tr></thead>
+                        <tbody>{at.tratamentos.map((t, idx) => <tr key={idx} className="border-b"><td className="p-1.5">{fmtDate(t.data)}</td><td className="p-1.5">{t.med}</td><td className="p-1.5">{t.dose}</td><td className="p-1.5">{t.via}</td></tr>)}</tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {Array.isArray(at.reavaliacoes) && at.reavaliacoes.length > 0 && (
+                    <div className="border rounded-md overflow-hidden text-xs bg-white shadow-inner">
+                      <div className="bg-gray-100 p-2 font-bold text-gray-600 border-b">Acompanhamento e Reavaliações</div>
+                      <table className="w-full text-left">
+                        <thead><tr className="bg-gray-50/50 border-b text-gray-400 font-bold text-[10px]"><th className="p-1.5">Data</th><th className="p-1.5">Evolução Clínica</th><th className="p-1.5">Responsável</th></tr></thead>
+                        <tbody>{at.reavaliacoes.map((rv, idx) => <tr key={idx} className="border-b"><td className="p-1.5">{fmtDate(rv.data)}</td><td className="p-1.5">{rv.ev}</td><td className="p-1.5">{rv.resp}</td></tr>)}</tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-2 border-t border-gray-100">
+                    <Btn variant="ghost" onClick={() => setForm(at)}><Edit3 size={12} /> Editar Ficha</Btn>
+                    <Btn variant="danger" onClick={async () => { if(confirm("Remover laudo clínico definitivamente?")) { await deleteRecord("atendimentos", "id", at.id); reload(); showToast("Removido com sucesso"); } }}><Trash2 size={12} /> Excluir Ficha</Btn>
                   </div>
                 </div>
-
-                <DetalheCampo label="Hipótese Diagnóstica" valor={at.diagnostico} />
-                <DetalheCampo label="Conduta Adotada" valor={at.conduta_adotada} />
-                <DetalheCampo label="Anotações / Descrição" valor={at.descricao_atendimento} />
-                <DetalheCampo label="Desfecho / Data Fechamento" valor={at.desfecho ? `${at.desfecho} (Em ${fmtDate(at.data_desfecho)})` : null} />
-
-                {/* Subtabelas Clínicas Blindadas Contra Travamento */}
-                {Array.isArray(at.tratamentos) && at.tratamentos.length > 0 && (
-                  <div className="border rounded-md overflow-hidden text-xs bg-white">
-                    <div className="bg-gray-100 p-2 font-bold text-gray-600 border-b">Tratamento Instituído</div>
-                    <table className="w-full text-left">
-                      <thead><tr className="bg-gray-50/50 border-b text-gray-400 font-bold text-[10px]"><th className="p-1.5">Data</th><th className="p-1.5">Medicamento</th><th className="p-1.5">Dose</th><th className="p-1.5">Via/Freq</th></tr></thead>
-                      <tbody>{at.tratamentos.map((t, idx) => <tr key={idx} className="border-b"><td className="p-1.5">{fmtDate(t.data)}</td><td className="p-1.5">{t.med}</td><td className="p-1.5">{t.dose}</td><td className="p-1.5">{t.via}</td></tr>)}</tbody>
-                    </table>
-                  </div>
-                )}
-
-                {Array.isArray(at.reavaliacoes) && at.reavaliacoes.length > 0 && (
-                  <div className="border rounded-md overflow-hidden text-xs bg-white">
-                    <div className="bg-gray-100 p-2 font-bold text-gray-600 border-b">Acompanhamento e Reavaliações</div>
-                    <table className="w-full text-left">
-                      <thead><tr className="bg-gray-50/50 border-b text-gray-400 font-bold text-[10px]"><th className="p-1.5">Data</th><th className="p-1.5">Evolução Clínica</th><th className="p-1.5">Responsável</th></tr></thead>
-                      <tbody>{at.reavaliacoes.map((rv, idx) => <tr key={idx} className="border-b"><td className="p-1.5">{fmtDate(rv.data)}</td><td className="p-1.5">{rv.ev}</td><td className="p-1.5">{rv.resp}</td></tr>)}</tbody>
-                    </table>
-                  </div>
-                )}
-
-                <div className="flex gap-2 pt-2 border-t border-gray-100">
-                  <Btn variant="ghost" onClick={() => setForm(at)}><Edit3 size={12} /> Editar Ficha</Btn>
-                  <Btn variant="danger" onClick={async () => { if(confirm("Remover laudo clínico definitivamente?")) { await deleteRecord("atendimentos", "id", at.id); reload(); showToast("Removido"); } }}><Trash2 size={12} /> Excluir</Btn>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -637,15 +595,16 @@ function AtendimentoFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
 }
 
 // ---------------------------------------------------------------------------
-// Módulo Reprodução (Prontuário das Matrizes)
+// Módulo Reprodução (Separação Absoluta Ativos/Inativos)
 // ---------------------------------------------------------------------------
 function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
   const [form, setForm] = useState(null);
   const [aba, setAba] = useState("ativos");
   const [aberto, setAberto] = useState(null);
 
+  // Filtro estrito corrigido para evitar falhas de leitura
   const filtrados = reproducoes.filter(r => {
-    const enc = !!r.term_data_matriz || !!r.term_data_reprodutor;
+    const enc = (r.term_data_matriz && r.term_data_matriz.trim() !== "") || (r.term_data_reprodutor && r.term_data_reprodutor.trim() !== "");
     return aba === "inativos" ? enc : !enc;
   });
 
@@ -653,12 +612,12 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-sm font-bold uppercase tracking-wider text-gray-500">Prontuários Reprodutivos de Matrizes</h2>
-        <Btn onClick={() => setForm({ ninhadas: [], monitoramentos: [], historicos_clinicos: [] })}><Plus size={13} /> Novo Acasalamento</Btn>
+        <Btn onClick={() => setForm({ ninhadas: [], monitoramentos: [], term_data_matriz: "", term_data_reprodutor: "" })}><Plus size={13} /> Novo Acasalamento</Btn>
       </div>
 
       {form && (
         <ReproducaoFormCompleto inicial={form} animais={animais} onCancelar={() => setForm(null)} onSalvar={async d => {
-          await saveRecord("reproducao", d); setForm(null); showToast("Prontuário salvo"); reload();
+          await saveRecord("reproducao", d); setForm(null); showToast("Prontuário salvo com sucesso"); reload();
         }} />
       )}
 
@@ -677,7 +636,7 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
                 <div>
                   <div className="flex items-center gap-2">
                     <SipBadge sip={r.sip} linhagem={animal?.linhagem} />
-                    <span className="text-xs text-gray-500 font-medium">× Macho: <strong>{r.reprodutor_id || "Não Identificado"}</strong></span>
+                    <span className="text-xs text-gray-500 font-medium">× Macho Reprodutor: <strong>{r.reprodutor_id || "Não Identificado"}</strong></span>
                   </div>
                   <p className="text-xs text-gray-400 mt-1">{Array.isArray(r.ninhadas) ? r.ninhadas.length : 0} partos catalogados · {tot.nascidos} filhotes · {tot.desmamados} desmames</p>
                 </div>
@@ -697,9 +656,8 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
                     </div>
                   </div>
 
-                  {/* Tabela Reprodutiva Protegida */}
                   {Array.isArray(r.ninhadas) && r.ninhadas.length > 0 && (
-                    <div className="border rounded overflow-hidden">
+                    <div className="border rounded overflow-hidden shadow-inner">
                       <div className="bg-gray-100 p-2 font-bold text-gray-600">Histórico Cronológico de Linhadas</div>
                       <table className="w-full text-left bg-white">
                         <thead><tr className="bg-gray-50 border-b text-gray-400 font-bold text-[10px]"><th className="p-1.5">Data Parto</th><th className="p-1.5 text-center">Nascidos</th><th className="p-1.5 text-center">Desmamados</th><th className="p-1.5">Observações</th></tr></thead>
@@ -709,16 +667,16 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
                   )}
 
                   {(r.term_data_matriz || r.term_data_reprodutor) && (
-                    <div className="bg-amber-50 border border-amber-200 rounded p-2.5 text-amber-900">
+                    <div className="bg-amber-50 border border-amber-200 rounded p-2.5 text-amber-900 shadow-sm">
                       <strong>Término Reprodutivo Declarado:</strong>
-                      {r.term_data_matriz && <p className="mt-0.5">· Matriz encerrada em: {fmtDate(r.term_data_matriz)} | Motivo: {r.term_motivo_matriz}</p>}
-                      {r.term_data_reprodutor && <p className="mt-0.5">· Reprodutor encerrado em: {fmtDate(r.term_data_reprodutor)} | Motivo: {r.term_motivo_reprodutor}</p>}
+                      {r.term_data_matriz && <p className="mt-0.5">· Matriz encerrada em: {fmtDate(r.term_data_matriz)} | Motivo: {r.term_motivo_matriz || "Não Informado"}</p>}
+                      {r.term_data_reprodutor && <p className="mt-0.5">· Reprodutor encerrado em: {fmtDate(r.term_data_reprodutor)} | Motivo: {r.term_motivo_reprodutor || "Não Informado"}</p>}
                     </div>
                   )}
 
                   <div className="flex gap-2 pt-1">
-                    <Btn variant="ghost" onClick={() => setForm(r)}><Edit3 size={12} /> Editar</Btn>
-                    <Btn variant="danger" onClick={async () => { if(confirm("Excluir este prontuário reprodutivo permanente?")) { await deleteRecord("reproducao", "id", r.id); reload(); showToast("Removido"); } }}><Trash2 size={12} /> Remover Ficha</Btn>
+                    <Btn variant="ghost" onClick={() => setForm(r)}><Edit3 size={12} /> Editar Prontuário</Btn>
+                    <Btn variant="danger" onClick={async () => { if(confirm("Excluir este prontuário reprodutivo permanente?")) { await deleteRecord("reproducao", "id", r.id); reload(); showToast("Removido com sucesso"); } }}><Trash2 size={12} /> Remover Ficha</Btn>
                   </div>
                 </div>
               )}
@@ -786,9 +744,9 @@ function ReproducaoFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
 
       <SecaoForm titulo="3. Término Reprodutivo (Inativação da Colônia)">
         <Field label="Data Descarte Matriz"><TextInput type="date" value={f.term_data_matriz} onChange={e => setF({...f, term_data_matriz: e.target.value})} /></Field>
-        <Field label="Motivo Matriz"><TextInput value={f.term_motivo_matriz} onChange={e => setF({...f, term_motivo_matriz: e.target.value})} /></Field>
+        <Field label="Motivo Matriz"><TextInput value={f.term_motivo_matriz} onChange={e => setF({...f, term_motivo_matriz: e.target.value})} placeholder="Ex: Idade avançada" /></Field>
         <Field label="Data Descarte Reprodutor"><TextInput type="date" value={f.term_data_reprodutor} onChange={e => setF({...f, term_data_reprodutor: e.target.value})} /></Field>
-        <Field label="Motivo Reprodutor"><TextInput value={f.term_motivo_reprodutor} onChange={e => setF({...f, term_motivo_reprodutor: e.target.value})} /></Field>
+        <Field label="Motivo Reprodutor"><TextInput value={f.term_motivo_reprodutor} onChange={e => setF({...f, term_motivo_reprodutor: e.target.value})} placeholder="Ex: Baixa fertilidade" /></Field>
       </SecaoForm>
 
       <div className="flex gap-2 pt-2 border-t"><Btn type="button" onClick={() => onSalvar({ ...f, id: f.id || genId("rep") })}>Salvar Prontuário</Btn><Btn type="button" variant="ghost" onClick={onCancelar}>Voltar</Btn></div>
@@ -812,7 +770,7 @@ function ModuloNecropsias({ necropsias, animais, reload, showToast }) {
 
       {form && (
         <NecropsiaFormCompleto inicial={form} animais={animais} onCancelar={() => setForm(null)} onSalvar={async d => {
-          await saveRecord("necropsias", d); setForm(null); showToast("Laudo arquivado"); reload();
+          await saveRecord("necropsias", d); setForm(null); showToast("Laudo arquivado com sucesso"); reload();
         }} />
       )}
 
@@ -891,7 +849,7 @@ function NecropsiaFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
         <span className="block text-[11px] font-bold uppercase tracking-wider text-[#4A7C7C] border-b mb-2">3. Exame Interno dos Sistemas Orgânicos</span>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {ACHADOS_SISTEMA_NECROPSIA.map(s => (
-            <Field key={s.k} label={s.label}><TextArea value={f[s.k] || ""} onChange={e => setF({...f, [s.k]: e.target.value})} placeholder="Descreva as alterações encontradas..." /></Field>
+            <Field key={s.k} label={s.label}><TextArea value={f[s.k] || ""} onChange={e => setF({...f, [s.k]: e.target.value})} placeholder="Descreva as alterações encontradas ou relate 'sem alterações'..." /></Field>
           ))}
         </div>
       </div>
@@ -911,7 +869,7 @@ function NecropsiaFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
 // ---------------------------------------------------------------------------
 function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, voltar, onEditarAnimal, onExcluirAnimal }) {
   const animal = animais.find(a => a.sip === sip);
-  if (!animal) return <p className="text-sm p-6 text-gray-400">Animal não localizado.</p>;
+  if (!animal) return <p className="text-sm p-6 text-gray-400">Animal não localizado no banco central.</p>;
 
   const as = atendimentos.filter(a => a.sip === sip);
   const rs = reproducoes.filter(r => r.sip === sip || r.reprodutor_id === sip);
@@ -921,17 +879,44 @@ function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, voltar, onEdit
       <div className="flex justify-between items-center">
         <Btn variant="ghost" onClick={voltar} className="!px-2"><ArrowLeft size={14} /> Voltar</Btn>
         <div className="flex gap-2">
-          <Btn variant="danger" onClick={() => { if(confirm(`Deseja remover o registro de ${animal.sip}?`)) onExcluirAnimal(animal.sip); }}><Trash2 size={13} /> Excluir</Btn>
+          <Btn variant="danger" onClick={() => { if(confirm(`Deseja remover permanentemente o registro de ${animal.sip}?`)) onExcluirAnimal(animal.sip); }}><Trash2 size={13} /> Excluir</Btn>
           <Btn onClick={() => onEditarAnimal(animal)} className="!bg-[#4A7C7C] hover:!bg-[#3A6363]"><Edit3 size={13} /> Editar Ficha</Btn>
         </div>
       </div>
 
       <div className="bg-white border rounded-lg p-5 shadow-sm">
         <div className="flex items-center gap-3"><SipBadge sip={animal.sip} linhagem={animal.linhagem} /><span className="text-base font-bold text-[#1B3A54]">{animal.linhagem} · {animal.sexo} · {animal.especie}</span></div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-4 text-xs text-gray-500 border-t pt-3">
-          <div>Status Vitalidade: <strong className="text-gray-700">{animal.status || "Ativo"}</strong></div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mt-4 text-xs text-gray-500 border-t pt-3">
+          <div>Status: <strong className="text-gray-700">{animal.status || "Ativo"}</strong></div>
           <div>Categoria: <strong className="text-gray-700">{animal.categoria || "Manutenção"}</strong></div>
           <div>Tempo de Vida: <strong className="text-gray-700">{calcIdadeApenasMeses(animal.data_nascimento)}</strong></div>
+          <div>Origem: <strong className="text-gray-700">{animal.origem || "Não Informada"}</strong></div>
+        </div>
+        {animal.observacoes && <div className="mt-3 text-xs bg-gray-50 p-2.5 rounded text-gray-600 border border-dashed italic">Notas Internas: {animal.observacoes}</div>}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white border rounded-lg p-4 shadow-sm">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3 border-b pb-1">Histórico Clínico Ambulatorial ({as.length})</h4>
+          <div className="space-y-2 max-h-56 overflow-y-auto">
+            {as.map(a => <div key={a.id} className="text-xs border-b border-gray-100 pb-1.5 last:border-0"><span className="text-gray-400 font-mono">{fmtDate(a.data)}:</span> <strong>{a.diagnostico || "Avaliação"}</strong> {a.desfecho && <span className="text-emerald-700 font-bold">({a.desfecho})</span>}</div>)}
+            {as.length === 0 && <p className="text-xs text-gray-400 italic">Nenhum evento clínico vinculado a este animal.</p>}
+          </div>
+        </div>
+
+        <div className="bg-white border rounded-lg p-4 shadow-sm">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3 border-b pb-1">Acasalamentos e Colônias ({rs.length})</h4>
+          <div className="space-y-2 max-h-56 overflow-y-auto">
+            {rs.map(r => {
+              const enc = (r.term_data_matriz && r.term_data_matriz.trim() !== "") || (r.term_data_reprodutor && r.term_data_reprodutor.trim() !== "");
+              return (
+                <div key={r.id} className="text-xs border-b border-gray-100 pb-1.5 last:border-0">
+                  Fêmea: <strong>{r.sip}</strong> × Macho: <strong>{r.reprodutor_id || "—"}</strong> {enc ? <span className="text-amber-700 font-bold">(Inativo)</span> : <span className="text-emerald-700 font-bold">(Ativo)</span>}
+                </div>
+              );
+            })}
+            {rs.length === 0 && <p className="text-xs text-gray-400 italic">Este animal não faz parte de nenhuma colônia de acasalamento.</p>}
+          </div>
         </div>
       </div>
     </div>
