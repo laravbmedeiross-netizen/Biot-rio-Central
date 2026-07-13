@@ -138,7 +138,6 @@ function totaisNinhadas(ninhadas = []) {
   );
 }
 
-// Componente Blocado Seguro para evitar Tela Branca
 function DetalheCampo({ label, valor }) {
   if (!valor || String(valor).trim() === "" || String(valor) === "undefined") return null;
   return (
@@ -357,24 +356,12 @@ export default function App() {
 }
 
 // ---------------------------------------------------------------------------
-// Resultados Busca Global
-// ---------------------------------------------------------------------------
-function BuscaResultados({ resultados, onSelect }) {
-  return (
-    <div className="space-y-3">
-      <h2 className="text-sm font-semibold uppercase text-gray-500">Resultados da Pesquisa ({resultados.length})</h2>
-      {resultados.length === 0 ? <p className="text-sm text-gray-400">Nenhum espécime correspondente encontrado.</p> : <div className="grid gap-2">{resultados.map(a => <CardAnimalCompacto key={a.sip} animal={a} onClick={() => onSelect(a.sip)} />)}</div>}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Painel Inicial (Dashboard)
+// Dashboard
 // ---------------------------------------------------------------------------
 function Dashboard({ animais, atendimentos, necropsias, reproducoes, goTo }) {
   const animaisAtivos = animais.filter(a => a.status === "Ativo" || !a.status);
-  const casaisAtivos = reproducoes.filter(r => !r.data_displacement && !r.data_id && !r.data_rendering && !r.data_enclosure && !r.data_encerramento);
-  const casaisInativos = reproducoes.filter(r => !!r.data_displacement || !!r.data_id || !!r.data_rendering || !!r.data_enclosure || !!r.data_encerramento);
+  const casaisAtivos = reproducoes.filter(r => !r.data_displacement && !r.data_id && !r.data_encerramento);
+  const casaisInativos = reproducoes.filter(r => !!r.data_displacement || !!r.data_id || !!r.data_encerramento);
   const atendimentosEmAndamento = atendimentos.filter(at => !at.desfecho || at.desfecho.trim() === "");
   const atendimentosFinalizados = atendimentos.filter(at => at.desfecho && at.desfecho.trim() !== "");
 
@@ -385,7 +372,7 @@ function Dashboard({ animais, atendimentos, necropsias, reproducoes, goTo }) {
       const animalMatriz = animais.find(a => a.sip === r.sip);
       const linhagem = animalMatriz?.linhagem || "Wistar";
       if (!LINHAGENS.includes(linhagem)) return;
-      const tipoStatus = (!r.data_displacement && !r.data_id && !r.data_rendering && !r.data_enclosure && !r.data_encerramento) ? "ativa" : "inativa";
+      const tipoStatus = (!r.data_displacement && !r.data_id && !r.data_encerramento) ? "ativa" : "inativa";
       const totalFicha = totaisNinhadas(r.ninhadas);
       mapa[linhagem][tipoStatus].nascidos += totalFicha.nascidos;
       mapa[linhagem][tipoStatus].desmamados += totalFicha.desmamados;
@@ -505,12 +492,12 @@ function AnimalForm({ inicial, animaisExistentes, onSalvar, onCancelar, salvando
       <div className="grid grid-cols-2 gap-x-4 gap-y-1">
         <Field label="Código SIP Identificador" required><TextInput value={f.sip} onChange={e => setF({...f, sip: e.target.value})} disabled={isEdicao} placeholder="Ex: BC_WS_001" /></Field>
         <Field label="Linhagem Genética" required><Select value={f.linhagem} onChange={e => setF({...f, linhagem: e.target.value})}>{LINHAGENS.map(l => <option key={l}>{l}</option>)}</Select></Field>
-        <Field label="Sexo Anatômico"><Select value={f.sexo} onChange={e => setF({...f, sexo: e.target.value})}><option>Fêmea</option><option>Macho</option></Select></Field>
-        <Field label="Data de Nascimento (Maternidade)"><TextInput type="date" value={f.data_nascimento || ""} onChange={e => setF({...f, data_nascimento: e.target.value})} /></Field>
+        <Field label="Sexo"><Select value={f.sexo} onChange={e => setF({...f, sexo: e.target.value})}><option>Fêmea</option><option>Macho</option></Select></Field>
+        <Field label="Data de Nascimento"><TextInput type="date" value={f.data_nascimento || ""} onChange={e => setF({...f, data_nascimento: e.target.value})} /></Field>
         <Field label="Categoria de Destinação"><Select value={f.categoria} onChange={e => setF({...f, categoria: e.target.value})}><option value="">Selecione...</option><option value="Matriz">Matriz</option><option value="Reprodutor">Reprodutor</option><option value="Experimentação">Experimentação</option></Select></Field>
         <Field label="Status de Vitalidade"><Select value={f.status} onChange={e => setF({...f, status: e.target.value})}>{STATUS_ANIMAL.map(s => <option key={s}>{s}</option>)}</Select></Field>
       </div>
-      <Field label="Notas Adicionais / Observações Gênicas"><TextArea value={f.observacoes || ""} onChange={e => setF({...f, observacoes: e.target.value})} /></Field>
+      <Field label="Notas Adicionais"><TextArea value={f.observacoes || ""} onChange={e => setF({...f, observacoes: e.target.value})} /></Field>
       {erro && <p className="text-xs text-red-600 font-bold">{erro}</p>}
       <div className="flex gap-2"><Btn type="submit" disabled={salvando}>{salvando ? "Processando..." : "Salvar Dados"}</Btn><Btn type="button" variant="ghost" onClick={onCancelar}>Cancelar</Btn></div>
     </form>
@@ -518,7 +505,7 @@ function AnimalForm({ inicial, animaisExistentes, onSalvar, onCancelar, salvando
 }
 
 // ---------------------------------------------------------------------------
-// Módulo Atendimentos (COMPLETO E DETALHADO)
+// Módulo Atendimentos
 // ---------------------------------------------------------------------------
 function ModuloAtendimentos({ atendimentos, animais, reload, showToast }) {
   const [form, setForm] = useState(null);
@@ -533,7 +520,7 @@ function ModuloAtendimentos({ atendimentos, animais, reload, showToast }) {
   async function executarExcluir(id) {
     if (confirm("Confirmar exclusão definitiva desta ficha de atendimento clínico?")) {
       await deleteRecord("atendimentos", "id", id);
-      showToast("Atendimento excluído com sucesso");
+      showToast("Atendimento excluído");
       reload();
     }
   }
@@ -567,7 +554,7 @@ function ModuloAtendimentos({ atendimentos, animais, reload, showToast }) {
                     <SipBadge sip={r.sip} linhagem={animal?.linhagem} />
                     <span className="text-xs text-gray-400">{fmtDate(r.data)} · Vet: {r.responsavel || "Não Informado"}</span>
                   </div>
-                  <p className="text-sm font-semibold mt-1.5 text-[#1B3A54]">{r.diagnostico || "Avaliação Clínica Geral"}</p>
+                  <p className="text-sm font-semibold mt-1.5 text-[#1B3A54]">{r.diagnostico || "Avaliação Técnica"}</p>
                 </div>
                 <ChevronRight size={16} className={`transition-transform text-gray-400 ${isAberto ? "rotate-90" : ""}`} />
               </button>
@@ -587,7 +574,7 @@ function ModuloAtendimentos({ atendimentos, animais, reload, showToast }) {
                     ))}
                   </div>
 
-                  <DetalheCampo label="Tratamento / Conduta Farmacológica" valor={r.conduta || r.medicamento_nome} />
+                  <DetalheCampo label="Tratamento / Conduta Farmacológica" valor={r.conduta} />
                   <DetalheCampo label="Nota de Conclusão / Desfecho" valor={r.desfecho} />
 
                   <div className="flex gap-2 pt-2 border-t border-gray-100/60">
@@ -619,7 +606,7 @@ function AtendimentoForm({ inicial, animais, onSalvar, onCancelar }) {
         <div className="grid grid-cols-3 gap-4">
           <Field label="Animal (Código SIP)" required><Select value={f.sip} onChange={e => setF({...f, sip: e.target.value})}><option value="">Selecione…</option>{animais.map(a => <option key={a.sip} value={a.sip}>{a.sip}</option>)}</Select></Field>
           <Field label="Data do Atendimento" required><TextInput type="date" value={f.data} onChange={e => setF({...f, data: e.target.value})} /></Field>
-          <Field label="Médico Veterinário / Responsável"><TextInput value={f.responsavel} onChange={e => setF({...f, responsavel: e.target.value})} /></Field>
+          <Field label="Médico Veterinário Responsável"><TextInput value={f.responsavel} onChange={e => setF({...f, responsavel: e.target.value})} /></Field>
         </div>
       </SecaoForm>
 
@@ -642,8 +629,8 @@ function AtendimentoForm({ inicial, animais, onSalvar, onCancelar }) {
 
       <SecaoForm titulo="Conclusão e Encerramento">
         <Field label="Diagnóstico Final Presuntivo"><TextArea value={f.diagnostico} onChange={e => setF({...f, diagnostico: e.target.value})} /></Field>
-        <Field label="Conduta Terapêutica / Prescrição Aplicada"><TextArea value={f.conduta} onChange={e => setF({...f, conduta: e.target.value})} /></Field>
-        <Field label="Nota de Desfecho / Arquivamento (Preencher para fechar e arquivar o caso)"><TextArea value={f.desfecho} onChange={e => setF({...f, desfecho: e.target.value})} placeholder="Se este campo for preenchido, o caso sairá da lista de acompanhamento ativo." /></Field>
+        <Field label="Conduta Terapêutica / Prescrição"><TextArea value={f.conduta} onChange={e => setF({...f, conduta: e.target.value})} /></Field>
+        <Field label="Nota de Desfecho (Para Arquivar)"><TextArea value={f.desfecho} onChange={e => setF({...f, desfecho: e.target.value})} placeholder="Se este campo for preenchido, o caso sairá da lista de acompanhamento ativo." /></Field>
       </SecaoForm>
 
       <div className="flex gap-2"><Btn type="submit">Salvar Ficha Clínica</Btn><Btn type="button" variant="ghost" onClick={onCancelar}>Cancelar</Btn></div>
@@ -652,7 +639,7 @@ function AtendimentoForm({ inicial, animais, onSalvar, onCancelar }) {
 }
 
 // ---------------------------------------------------------------------------
-// Módulo Reprodução (COMPLETO E DETALHADO)
+// Módulo Reprodução
 // ---------------------------------------------------------------------------
 function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
   const [form, setForm] = useState(null);
@@ -677,7 +664,7 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-xl font-bold">Fichas e Prontuários Reprodutivos</h2>
-          <p className="text-xs text-gray-400">Controle de matrizes reprodutoras, haras de linhagens e ninhadas.</p>
+          <p className="text-xs text-gray-400">Controle de matrizes reprodutoras e ninhadas.</p>
         </div>
         <Btn onClick={() => setForm({})}><Plus size={14} /> Novo Prontuário</Btn>
       </div>
@@ -686,7 +673,7 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
 
       <div className="flex gap-2 border-b pb-2">
         <button onClick={() => setAba("ativos")} className={`px-3 py-1.5 text-xs font-semibold rounded-md ${aba === "ativos" ? "bg-[#1B3A54] text-white" : "bg-white border text-gray-600"}`}>Casais Ativos ({reproducoes.filter(r => !r.data_displacement && !r.data_id && !r.data_encerramento).length})</button>
-        <button onClick={() => setAba("inativos")} className={`px-3 py-1.5 text-xs font-semibold rounded-md ${aba === "inativos" ? "bg-amber-700 text-white" : "bg-white border text-gray-600"}`}>Casais Inativos ({reproducoes.filter(r => r.data_displacement || r.data_id || r.data_rendering || r.data_enclosure || r.data_encerramento).length})</button>
+        <button onClick={() => setAba("inativos")} className={`px-3 py-1.5 text-xs font-semibold rounded-md ${aba === "inativos" ? "bg-amber-700 text-white" : "bg-white border text-gray-600"}`}>Casais Inativos ({reproducoes.filter(r => r.data_displacement || r.data_id || r.data_encerramento).length})</button>
       </div>
 
       <div className="grid gap-2">
@@ -705,7 +692,7 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
                     {r.reprodutor_id && <span className="text-xs text-gray-400">× Reprodutor Macho: <strong>{r.reprodutor_id}</strong></span>}
                     {enc && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold">Inativo</span>}
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">{r.ninhadas?.length || 0} ninhada(s) registradas · {tot.nascidos} nascidos totais · {tot.desmamados} desmamados com sucesso</p>
+                  <p className="text-xs text-gray-500 mt-1">{r.ninhadas?.length || 0} ninhada(s) · {tot.nascidos} nascidos · {tot.desmamados} desmamados</p>
                 </div>
                 <ChevronRight size={16} className={`transition-transform text-gray-400 ${isAberto ? "rotate-90" : ""}`} />
               </button>
@@ -714,7 +701,7 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
                 <div className="mt-3 pt-3 border-t border-gray-100 space-y-3">
                   {r.ninhadas?.filter(n => n.data).length > 0 ? (
                     <div className="overflow-x-auto border rounded bg-gray-50/50 p-2">
-                      <span className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Histórico Cronológico de Partos</span>
+                      <span className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Histórico de Partos</span>
                       <table className="w-full text-xs text-left border-collapse bg-white">
                         <thead>
                           <tr className="text-gray-400 border-b pb-1 font-semibold">
@@ -722,7 +709,7 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
                             <th className="py-1 text-center">Nascidos</th>
                             <th className="py-1 text-center">Mortos</th>
                             <th className="py-1 text-center">Desmamados</th>
-                            <th className="py-1 pl-2">Notas Ocorrência</th>
+                            <th className="py-1 pl-2">Notas</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -738,7 +725,7 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
                         </tbody>
                       </table>
                     </div>
-                  ) : <p className="text-xs text-gray-400 italic">Nenhum evento de parto registrado neste prontuário.</p>}
+                  ) : <p className="text-xs text-gray-400 italic">Nenhum evento de parto registrado.</p>}
 
                   <div className="grid grid-cols-2 gap-3 bg-gray-50/20 p-2 rounded border border-gray-100">
                     <DetalheCampo label="Linhagem / Genealogia Informada" valor={r.genealogia} />
@@ -749,7 +736,7 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
 
                   {enc && (
                     <div className="bg-amber-50 border border-amber-200 p-2 rounded text-xs text-amber-900">
-                      <strong>Ficha Inativada:</strong> Desativada em {fmtDate(r.data_displacement || r.data_id || r.data_enclosure || r.data_encerramento)} {r.motivo_recording || r.motivo_encerramento ? `| Motivo: ${r.motivo_recording || r.motivo_encerramento}` : ""}
+                      <strong>Ficha Inativada:</strong> Desativada em {fmtDate(r.data_displacement || r.data_id || r.data_默默 || r.data_encerramento)} {r.motivo_encerramento ? `| Motivo: ${r.motivo_encerramento}` : ""}
                     </div>
                   )}
 
@@ -804,7 +791,7 @@ function ReproducaoForm({ inicial, animais, onSalvar, onCancelar }) {
               <div><span className="text-[10px] text-gray-400 font-bold uppercase">Mortos</span><TextInput type="number" value={n.n_mortos || ""} onChange={e => updNinhada(i, "n_mortos", e.target.value)} /></div>
               <div><span className="text-[10px] text-gray-400 font-bold uppercase">Desmamados</span><TextInput type="number" value={n.n_desmamados || ""} onChange={e => updNinhada(i, "n_desmamados", e.target.value)} /></div>
             </div>
-            <TextInput placeholder="Notas de intercorrências ou observações do parto" value={n.observacoes || ""} onChange={e => updNinhada(i, "observacoes", e.target.value)} />
+            <TextInput placeholder="Notas de intercorrências do parto" value={n.observacoes || ""} onChange={e => updNinhada(i, "observacoes", e.target.value)} />
             {f.ninhadas.length > 1 && <button type="button" onClick={() => setF({ ...f, ninhadas: f.ninhadas.filter((_, idx) => idx !== i) })} className="text-xs text-red-600 font-bold mt-1 block">Remover ninhada</button>}
           </div>
         ))}
@@ -813,8 +800,8 @@ function ReproducaoForm({ inicial, animais, onSalvar, onCancelar }) {
 
       <SecaoForm titulo="Dados de Desativação / Encerramento">
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Data de Encerramento do Casal"><TextInput type="date" value={f.data_displacement || f.data_enclosure || f.data_id || f.data_encerramento || ""} onChange={e => setF({ ...f, data_id: e.target.value, data_displacement: e.target.value, data_enclosure: e.target.value, data_encerramento: e.target.value })} /></Field>
-          <Field label="Motivo do Encerramento / Descarte"><TextInput value={f.motivo_encerramento || ""} onChange={e => setF({ ...f, motivo_recording: e.target.value, motivo_encerramento: e.target.value })} placeholder="Ex: Baixa produtividade, idade avançada" /></Field>
+          <Field label="Data de Encerramento do Casal"><TextInput type="date" value={f.data_displacement || f.data_id || f.data_enclosure || f.data_encerramento || ""} onChange={e => setF({ ...f, data_id: e.target.value, data_displacement: e.target.value, data_enclosure: e.target.value, data_encerramento: e.target.value })} /></Field>
+          <Field label="Motivo do Encerramento / Descarte"><TextInput value={f.motivo_encerramento || ""} onChange={e => setF({ ...f, motivo_encerramento: e.target.value })} placeholder="Ex: Baixa produtividade, idade avançada" /></Field>
         </div>
       </SecaoForm>
 
@@ -825,14 +812,14 @@ function ReproducaoForm({ inicial, animais, onSalvar, onCancelar }) {
 }
 
 // ---------------------------------------------------------------------------
-// Módulo Necropsias (COMPLETO E DETALHADO)
+// Módulo Necropsias
 // ---------------------------------------------------------------------------
 function ModuloNecropsias({ necropsias, animais, reload, showToast }) {
   const [form, setForm] = useState(null);
   const [aberto, setAberto] = useState(null);
 
   async function executarExcluir(id) {
-    if (confirm("Confirmar a exclusão permanente deste laudo anatomopatológico?")) {
+    if (confirm("Confirmar a exclusão permanente deste laudo?")) {
       await deleteRecord("necropsias", "id", id);
       showToast("Laudo de necropsia excluído");
       reload();
@@ -844,7 +831,7 @@ function ModuloNecropsias({ necropsias, animais, reload, showToast }) {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-xl font-bold">Laudos de Necropsia Macroscópica</h2>
-          <p className="text-xs text-gray-400">Registros post-mortem por sistemas anatômicos e integridade de carcaça.</p>
+          <p className="text-xs text-gray-400">Registros post-mortem por sistemas anatômicos.</p>
         </div>
         <Btn onClick={() => setForm({})}><Plus size={14} /> Nova Necropsia</Btn>
       </div>
@@ -870,7 +857,7 @@ function ModuloNecropsias({ necropsias, animais, reload, showToast }) {
 
               {isAberto && (
                 <div className="mt-3 pt-3 border-t border-gray-100 space-y-2">
-                  <DetalheCampo label="Histórico Clínico Post-Mortem / Causa Provável" valor={r.historico} />
+                  <DetalheCampo label="Histórico Clínico Post-Mortem" valor={r.historico} />
                   
                   <div className="grid grid-cols-3 gap-2 bg-gray-50/40 p-2 rounded">
                     <DetalheCampo label="Condição Carcaça" valor={r.condicao_carcaca} />
@@ -886,7 +873,7 @@ function ModuloNecropsias({ necropsias, animais, reload, showToast }) {
                     ))}
                   </div>
 
-                  <DetalheCampo label="Fragmentos / Coletas Enviadas" valor={r.coletas} />
+                  <DetalheCampo label="Fragmentos Coletados" valor={r.coletas} />
                   <DetalheCampo label="Diagnóstico Final Conclusivo" valor={r.diagnostico_final} />
                   <DetalheCampo label="Destino Final das Amostras" valor={r.destino} />
 
@@ -916,20 +903,20 @@ function NecropsiaForm({ inicial, animais, onSalvar, onCancelar }) {
     <form onSubmit={(e) => { e.preventDefault(); onSalvar({ ...f, id: f.id || genId("necro") }); }} className="bg-white border rounded-lg p-5 space-y-4 text-left shadow-sm">
       <SecaoForm titulo="Metadados de Patologia">
         <div className="grid grid-cols-3 gap-4">
-          <Field label="Animal Necropsado (SIP)" required><Select value={f.sip} onChange={e => setF({...f, sip: e.target.value})}><option value="">Selecione…</option>{animais.map(a => <option key={a.sip} value={a.sip}>{a.sip}</option>)}</Select></Field>
-          <Field label="Data do Laudo/Inspeção" required><TextInput type="date" value={f.data} onChange={e => setF({...f, data: e.target.value})} /></Field>
-          <Field label="Médico Veterinário / Patologista"><TextInput value={f.responsavel} onChange={e => setF({...f, responsavel: e.target.value})} /></Field>
+          <Field label="Animal (SIP)" required><Select value={f.sip} onChange={e => setF({...f, sip: e.target.value})}><option value="">Selecione…</option>{animais.map(a => <option key={a.sip} value={a.sip}>{a.sip}</option>)}</Select></Field>
+          <Field label="Data do Laudo" required><TextInput type="date" value={f.data} onChange={e => setF({...f, data: e.target.value})} /></Field>
+          <Field label="Médico Veterinário Patologista"><TextInput value={f.responsavel} onChange={e => setF({...f, responsavel: e.target.value})} /></Field>
         </div>
       </SecaoForm>
 
       <SecaoForm titulo="Exame Físico Cadavérico Externo">
-        <Field label="Histórico de Óbito / Indicação Teórica"><TextArea value={f.historico} onChange={e => setF({...f, historico: e.target.value})} /></Field>
+        <Field label="Histórico de Óbito"><TextArea value={f.historico} onChange={e => setF({...f, historico: e.target.value})} /></Field>
         <div className="grid grid-cols-3 gap-4">
           <Field label="Condição da Carcaça"><Select value={f.condicao_carcaca} onChange={e => setF({...f, condicao_carcaca: e.target.value})}><option>Fresca</option><option>Refrigerada</option><option>Autolisada</option></Select></Field>
-          <Field label="Escore Corporal Cadavérico (BCS)"><Select value={f.bcs} onChange={e => setF({...f, bcs: e.target.value})}>{BCS_OPCOES.map(o => <option key={o.v} value={o.v}>{o.label}</option>)}</Select></Field>
+          <Field label="Escore Corporal (BCS)"><Select value={f.bcs} onChange={e => setF({...f, bcs: e.target.value})}>{BCS_OPCOES.map(o => <option key={o.v} value={o.v}>{o.label}</option>)}</Select></Field>
           <Field label="Grau de Cromodacriorreia"><Select value={f.cromodacriorreia} onChange={e => setF({...f, cromodacriorreia: e.target.value})}>{CROMO_OPCOES.map(o => <option key={o.v} value={o.v}>{o.label}</option>)}</Select></Field>
         </div>
-        <Field label="Inspeção de Pelagem, Mucosas e Orifícios Naturais"><TextArea value={f.avaliacao_externa} onChange={e => setF({...f, avaliacao_externa: e.target.value})} /></Field>
+        <Field label="Inspeção de Pelagem, Mucosas e Orifícios"><TextArea value={f.avaliacao_externa} onChange={e => setF({...f, avaliacao_externa: e.target.value})} /></Field>
       </SecaoForm>
 
       <SecaoForm titulo="Laudo Interno por Sistemas Anatômicos">
@@ -941,12 +928,12 @@ function NecropsiaForm({ inicial, animais, onSalvar, onCancelar }) {
       </SecaoForm>
 
       <SecaoForm titulo="Diagnósticos Finais de Necropsia">
-        <Field label="Amostras e Fragmentos de Órgãos Coletados"><TextArea value={f.coletas} onChange={e => setF({...f, coletas: e.target.value})} /></Field>
+        <Field label="Amostras e Fragmentos Coletados"><TextArea value={f.coletas} onChange={e => setF({...f, coletas: e.target.value})} /></Field>
         <div className="grid grid-cols-2 gap-4">
           <Field label="Diagnóstico Macroscópico Geral"><TextArea value={f.diagnostico_macroscopico} onChange={e => setF({...f, diagnostico_macroscopico: e.target.value})} /></Field>
-          <Field label="Diagnóstico Final / Histopatológico (Conclusivo)"><TextArea value={f.diagnostico_final} onChange={e => setF({...f, diagnostico_final: e.target.value})} /></Field>
+          <Field label="Diagnóstico Final (Conclusivo)"><TextArea value={f.diagnostico_final} onChange={e => setF({...f, diagnostico_final: e.target.value})} /></Field>
         </div>
-        <Field label="Destino Final dos Resíduos Orgânicos"><Select value={f.destino} onChange={e => setF({...f, destino: e.target.value})}><option>Descarte</option><option>Histopatologia</option><option>Amostra Biológica Congelada</option></Select></Field>
+        <Field label="Destino Final dos Resíduos"><Select value={f.destino} onChange={e => setF({...f, destino: e.target.value})}><option>Descarte</option><option>Histopatologia</option><option>Amostra Biológica Congelada</option></Select></Field>
       </SecaoForm>
 
       <div className="flex gap-2"><Btn type="submit">Salvar Laudo Macroscópico</Btn><Btn type="button" variant="ghost" onClick={onCancelar}>Cancelar</Btn></div>
@@ -996,11 +983,27 @@ function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, voltar, onEdit
         <div className="bg-white border rounded-lg p-4">
           <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3 border-b pb-1">Vínculo de Reprodução ({rs.length})</h4>
           <div className="space-y-2 max-h-56 overflow-y-auto">
-            {rs.map(r => <div key={r.id} className="text-xs border-b border-gray-100 pb-1 last:border-0">Fêmea: <strong>{r.sip}</strong> × Macho: <strong>{r.reprodutor_id || "—"}</strong> {r.data_displacement || r.data_id || r.data_ his || r.data_id || r.data_encerramento ? <span className="text-amber-700 font-bold">(Inativo)</span> : <span className="text-emerald-700 font-bold">(Ativo)</span>}</div>)}
+            {rs.map(r => {
+              const enc = !!r.data_displacement || !!r.data_id || !!r.data_id || !!r.data_id || !!r.data_id || !!r.data_id || !!r.data_id || !!r.data_id || !!r.data_id || !!r.data_encerramento;
+              return (
+                <div key={r.id} className="text-xs border-b border-gray-100 pb-1 last:border-0">
+                  Fêmea: <strong>{r.sip}</strong> × Macho: <strong>{r.reprodutor_id || "—"}</strong> {enc ? <span className="text-amber-700 font-bold">(Inativo)</span> : <span className="text-emerald-700 font-bold">(Ativo)</span>}
+                </div>
+              );
+            })}
             {rs.length === 0 && <p className="text-xs text-gray-400 italic">Este animal não faz parte de nenhuma colônia de acasalamento.</p>}
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function Secao({ titulo, children }) {
+  return (
+    <div className="mb-5">
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-[#5C5C52] mb-2">{titulo}</h3>
+      <div className="bg-white border border-[#E4E0D4] rounded-lg px-4 py-2">{children || <p className="text-xs text-gray-400 py-1">Nenhum registro.</p>}</div>
     </div>
   );
 }
