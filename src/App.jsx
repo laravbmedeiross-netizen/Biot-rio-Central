@@ -513,7 +513,8 @@ function ModuloAtendimentos({ atendimentos, animais, reload, showToast }) {
 
       {form && (
         <AtendimentoFormCompleto inicial={form} animais={animais} onCancelar={() => setForm(null)} onSalvar={async d => {
-          await saveRecord("atendimentos", d); setForm(null); showToast("Ficha gravada com sucesso"); reload();
+          try { await saveRecord("atendimentos", d); setForm(null); showToast("Ficha gravada com sucesso"); reload(); }
+          catch (err) { console.error(err); alert("Erro ao salvar: " + (err.message || "verifique os campos.")); }
         }} />
       )}
 
@@ -707,7 +708,8 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
 
       {form && (
         <ReproducaoFormCompleto inicial={form} animais={animais} onCancelar={() => setForm(null)} onSalvar={async d => {
-          await saveRecord("reproducao", d); setForm(null); showToast("Prontuário salvo com sucesso"); reload();
+          try { await saveRecord("reproducao", d); setForm(null); showToast("Prontuário salvo com sucesso"); reload(); }
+          catch (err) { console.error(err); alert("Erro ao salvar: " + (err.message || "verifique os campos.")); }
         }} />
       )}
 
@@ -860,7 +862,8 @@ function ModuloNecropsias({ necropsias, animais, reload, showToast }) {
 
       {form && (
         <NecropsiaFormCompleto inicial={form} animais={animais} onCancelar={() => setForm(null)} onSalvar={async d => {
-          await saveRecord("necropsias", d); setForm(null); showToast("Laudo arquivado com sucesso"); reload();
+          try { await saveRecord("necropsias", d); setForm(null); showToast("Laudo arquivado com sucesso"); reload(); }
+          catch (err) { console.error(err); alert("Erro ao salvar: " + (err.message || "verifique os campos.")); }
         }} />
       )}
 
