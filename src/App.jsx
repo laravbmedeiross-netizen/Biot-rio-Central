@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import Login from "./Login";
+
 // ---------------------------------------------------------------------------
 // Constantes de domínio
 // ---------------------------------------------------------------------------
@@ -92,6 +93,44 @@ function fmtDate(iso) {
   }
 }
 
+// Funções Auxiliares de Idade
+function calcIdade(dataNasc) {
+  if (!dataNasc) return null;
+  const nasc = new Date(dataNasc + "T00:00:00");
+  const hoje = new Date();
+  let meses = (hoje.getFullYear() - nasc.getFullYear()) * 12 + (hoje.getMonth() - nasc.getMonth());
+  if (hoje.getDate() < nasc.getDate()) meses--;
+  if (meses < 0) return null;
+  if (meses < 1) return "< 1 mês";
+  const anos = Math.floor(meses / 12);
+  const restoMeses = meses % 12;
+  if (anos === 0) return `${meses} ${meses === 1 ? "mês" : "meses"}`;
+  return `${anos}a ${restoMeses}m (${meses} ${meses === 1 ? "mês" : "meses"})`;
+}
+
+function calcIdadeApenasMeses(dataNasc) {
+  if (!dataNasc) return "—";
+  const nasc = new Date(dataNasc + "T00:00:00");
+  const hoje = new Date();
+  let meses = (hoje.getFullYear() - nasc.getFullYear()) * 12 + (hoje.getMonth() - nasc.getMonth());
+  if (hoje.getDate() < nasc.getDate()) meses--;
+  if (meses < 0) return "—";
+  return `${meses} ${meses === 1 ? "mês" : "meses"}`;
+}
+
+function totaisNinhadas(ninhadas = []) {
+  return ninhadas.reduce(
+    (acc, n) => ({
+      nascidos: acc.nascidos + (Number(n.n_nascidos) || 0),
+      machos: acc.machos + (Number(n.n_machos) || 0),
+      femeas: acc.femeas + (Number(n.n_femeas) || 0),
+      mortos: acc.mortos + (Number(n.n_mortos) || 0),
+      desmamados: acc.desmamados + (Number(n.n_desmamados) || 0),
+    }),
+    { nascidos: 0, machos: 0, femeas: 0, mortos: 0, desmamados: 0 }
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Componentes base
 // ---------------------------------------------------------------------------
@@ -105,6 +144,34 @@ function SipBadge({ sip, linhagem }) {
     >
       {sip || "sem SIP"}
     </span>
+  );
+}
+
+// Componente Card de Exibição Compacta do Animal
+function CardAnimalCompacto({ animal, onClick }) {
+  return (
+    <button 
+      onClick={onClick} 
+      className="w-full flex items-center justify-between bg-white border border-[#E4E0D4] rounded-lg px-4 py-3 hover:border-[#4A7C7C] transition-colors text-left"
+    >
+      <div className="flex items-center gap-3">
+        <SipBadge sip={animal.sip} linhagem={animal.linhagem} />
+        <span className="text-sm text-[#5C5C52]">
+          {animal.sexo} · {animal.linhagem} · {calcIdadeApenasMeses(animal.data_nascimento)}
+        </span>
+        {animal.categoria && (
+          <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium">
+            {animal.categoria}
+          </span>
+        )}
+      </div>
+      <div className="flex items-center gap-3">
+        <span className={`text-xs px-2 py-0.5 rounded-full ${animal.status === "Ativo" ? "bg-[#4A7C7C]/10 text-[#3A6363]" : "bg-[#A6493C]/10 text-[#A6493C]"}`}>
+          {animal.status || "Ativo"}
+        </span>
+        <ChevronRight size={16} className="text-[#B5AF9E]" />
+      </div>
+    </button>
   );
 }
 
@@ -179,7 +246,7 @@ function ConfigAviso() {
 }
 
 // ---------------------------------------------------------------------------
-// App
+// Componente de exportação principal
 // ---------------------------------------------------------------------------
 
 export default function App() {
@@ -364,17 +431,7 @@ function BuscaResultados({ resultados, onSelect }) {
       ) : (
         <div className="grid gap-2">
           {resultados.map((a) => (
-            <button
-              key={a.sip}
-              onClick={() => onSelect(a.sip)}
-              className="flex items-center justify-between bg-white border border-[#E4E0D4] rounded-lg px-4 py-3 hover:border-[#4A7C7C] transition-colors text-left"
-            >
-              <div className="flex items-center gap-3">
-                <SipBadge sip={a.sip} linhagem={a.linhagem} />
-                <span className="text-sm text-[#5C5C52]">{a.linhagem} · {a.sexo}</span>
-              </div>
-              <ChevronRight size={16} className="text-[#B5AF9E]" />
-            </button>
+            <CardAnimalCompacto key={a.sip} animal={a} onClick={() => onSelect(a.sip)} />
           ))}
         </div>
       )}
@@ -514,18 +571,7 @@ function ModuloAnimais({ animais, reload, showToast, goTo }) {
       ) : (
         <div className="grid gap-2 mt-4">
           {animais.map((a) => (
-            <button key={a.sip} onClick={() => goTo(`animal-detalhe:${a.sip}`)} className="flex items-center justify-between bg-white border border-[#E4E0D4] rounded-lg px-4 py-3 hover:border-[#4A7C7C] transition-colors text-left">
-              <div className="flex items-center gap-3">
-                <SipBadge sip={a.sip} linhagem={a.linhagem} />
-                <span className="text-sm text-[#5C5C52]">{a.sexo} · nasc. {fmtDate(a.data_nascimento)}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className={`text-xs px-2 py-0.5 rounded-full ${a.status === "Ativo" ? "bg-[#4A7C7C]/10 text-[#3A6363]" : "bg-[#A6493C]/10 text-[#A6493C]"}`}>
-                  {a.status || "Ativo"}
-                </span>
-                <ChevronRight size={16} className="text-[#B5AF9E]" />
-              </div>
-            </button>
+            <CardAnimalCompacto key={a.sip} animal={a} onClick={() => goTo(`animal-detalhe:${a.sip}`)} />
           ))}
         </div>
       )}
@@ -535,7 +581,9 @@ function ModuloAnimais({ animais, reload, showToast, goTo }) {
 
 function AnimalForm({ inicial, animaisExistentes, onSalvar, onCancelar, salvando }) {
   const [f, setF] = useState({
-    sip: "", linhagem: LINHAGENS[0], sexo: "Fêmea", data_nascimento: "", origem: "", status: "Ativo", observacoes: "", ...inicial,
+    sip: "", linhagem: LINHAGENS[0], sexo: "Fêmea", data_nascimento: "", origem: "", categoria: "", 
+    ceua_protocolo: "", ceua_professor: "", ceua_pesquisador: "", avos_maternos: "", avos_paternos: "",
+    status: "Ativo", observacoes: "", ...inicial,
   });
   const [erro, setErro] = useState("");
 
@@ -570,15 +618,63 @@ function AnimalForm({ inicial, animaisExistentes, onSalvar, onCancelar, salvando
         <Field label="Data de nascimento">
           <TextInput type="date" value={f.data_nascimento || ""} onChange={(e) => upd("data_nascimento", e.target.value)} />
         </Field>
-        <Field label="Origem">
-          <TextInput value={f.origem} onChange={(e) => upd("origem", e.target.value)} placeholder="Ex: matriz BC_SW_012.25" />
+        
+        {/* Alteração 1: Adição das categorias e origens estruturadas */}
+        <Field label="Categoria">
+          <Select value={f.categoria} onChange={(e) => upd("categoria", e.target.value)}>
+            <option value="">Selecione...</option>
+            <option value="Matriz">Matriz</option>
+            <option value="Reprodutor">Reprodutor</option>
+            <option value="Manutenção">Manutenção</option>
+            <option value="Experimentação">Experimentação</option>
+          </Select>
         </Field>
+        <Field label="Origem">
+          <Select value={f.origem} onChange={(e) => upd("origem", e.target.value)}>
+            <option value="">Selecione...</option>
+            <option value="Biotério Central">Biotério Central</option>
+            <option value="Biotério LENq">Biotério LENq</option>
+            <option value="Biotério PPGBIOEF">Biotério PPGBIOEF</option>
+            <option value="Biotério LABMAT">Biotério LABMAT</option>
+            <option value="Outro">Outro</option>
+          </Select>
+        </Field>
+
         <Field label="Status">
           <Select value={f.status} onChange={(e) => upd("status", e.target.value)}>
             {STATUS_ANIMAL.map((s) => <option key={s}>{s}</option>)}
           </Select>
         </Field>
       </div>
+
+      {/* Condicional de Exibição dos dados do CEUA se for de experimentação */}
+      {f.categoria === "Experimentação" && (
+        <div className="bg-blue-50/60 p-4 rounded-md mb-4 grid grid-cols-1 md:grid-cols-3 gap-4 border border-blue-200">
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide text-blue-900 mb-1">Nº do Protocolo CEUA</label>
+            <input type="text" value={f.ceua_protocolo} onChange={(e) => upd("ceua_protocolo", e.target.value)} className={inputCls} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide text-blue-900 mb-1">Professor</label>
+            <input type="text" value={f.ceua_professor} onChange={(e) => upd("ceua_professor", e.target.value)} className={inputCls} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide text-blue-900 mb-1">Pesquisador Responsável</label>
+            <input type="text" value={f.ceua_pesquisador} onChange={(e) => upd("ceua_pesquisador", e.target.value)} className={inputCls} />
+          </div>
+        </div>
+      )}
+
+      {/* Rastreabilidade Genética: Avós */}
+      <div className="grid grid-cols-2 gap-x-4 border-t border-gray-100 pt-3 mt-1">
+        <Field label="Avós Maternos">
+          <TextInput placeholder="Avó e Avô Maternos" value={f.avos_maternos} onChange={(e) => upd("avos_maternos", e.target.value)} />
+        </Field>
+        <Field label="Avós Paternos">
+          <TextInput placeholder="Avó e Avô Paternos" value={f.avos_paternos} onChange={(e) => upd("avos_paternos", e.target.value)} />
+        </Field>
+      </div>
+
       <Field label="Observações">
         <TextArea value={f.observacoes} onChange={(e) => upd("observacoes", e.target.value)} />
       </Field>
@@ -617,7 +713,7 @@ function ModuloAtendimentos({ atendimentos, animais, reload, showToast }) {
   const lista = filtroSip ? atendimentos.filter((a) => a.sip === filtroSip) : atendimentos;
 
   return (
-    <div>
+    <div className="space-y-4">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h2 className="text-xl font-semibold">Fichas de atendimento</h2>
@@ -665,6 +761,13 @@ function ModuloAtendimentos({ atendimentos, animais, reload, showToast }) {
                   </div>
                   <p className="text-sm text-[#2B2B24]"><span className="font-medium">Diagnóstico:</span> {r.diagnostico || "—"}</p>
                   <p className="text-sm text-[#5C5C52]"><span className="font-medium">Conduta:</span> {r.conduta || "—"}</p>
+                  
+                  {r.medicamento_nome && (
+                    <div className="mt-2 text-xs bg-gray-50 p-2 rounded border border-gray-100 text-gray-700">
+                      <strong>Medicamento:</strong> {r.medicamento_nome} {r.medicamento_dosagem ? `(${r.medicamento_dosagem})` : ""} · {r.medicamento_via || "—"} · {r.medicamento_frequencia || "—"}
+                    </div>
+                  )}
+
                   {r.evolucoes?.length > 0 && (
                     <p className="text-xs text-[#4A7C7C] mt-1">{r.evolucoes.length} registro(s) de evolução clínica</p>
                   )}
@@ -682,6 +785,14 @@ function ModuloAtendimentos({ atendimentos, animais, reload, showToast }) {
                     <DetalheCampo label="Sinais objetivos" valor={r.sinais_objetivos} />
                     <DetalheCampo label="Exames laboratoriais" valor={r.exames_laboratoriais} />
                     <DetalheCampo label="Tratamento" valor={r.tratamento} />
+                    
+                    {r.medicamento_nome && (
+                      <div className="mb-2">
+                        <span className="block text-xs font-semibold uppercase tracking-wide text-[#5C5C52] mb-0.5">Prescrição Farmacológica</span>
+                        <p className="text-sm text-[#2B2B24]">{r.medicamento_nome} | Dosagem: {r.medicamento_dosagem || "—"} | Via: {r.medicamento_via || "—"} | Frequência: {r.medicamento_frequencia || "—"}</p>
+                      </div>
+                    )}
+
                     <DetalheCampo label="Retorno / acompanhamento" valor={r.retorno} />
                     <DetalheCampo label="Desfecho" valor={r.desfecho} />
                     {r.evolucoes?.length > 0 && (
@@ -740,6 +851,7 @@ function AtendimentoForm({ inicial, animais, onSalvar, onCancelar }) {
     sist_digestorio: "", sist_neurologico: "", sist_reprodutivo: "",
     sinais_objetivos: "",
     diagnostico: "", conduta: "", tratamento: "", exames_laboratoriais: "",
+    medicamento_nome: "", medicamento_dosagem: "", medicamento_via: "", medicamento_frequencia: "",
     evolucoes: [],
     retorno: "", desfecho: "",
     ...inicial,
@@ -790,10 +902,10 @@ function AtendimentoForm({ inicial, animais, onSalvar, onCancelar }) {
             <TextInput value={f.responsavel} onChange={(e) => upd("responsavel", e.target.value)} placeholder="Nome" />
           </Field>
         </div>
-        {alertas.length > 0 && (
-          <div className="flex items-start gap-2 bg-[#C9852B]/10 border border-[#C9852B]/40 rounded-md px-3 py-2 text-sm text-[#8A5E1F]">
+        {animalSel && (
+          <div className="flex items-start gap-2 bg-[#C9852B]/10 border border-[#C9852B]/40 rounded-md px-3 py-2 text-sm text-[#8A5E1F] mb-3">
             <AlertTriangle size={15} className="mt-0.5 shrink-0" />
-            <span>Alertas típicos de {animalSel.linhagem}: <strong>{alertas.join(", ")}</strong></span>
+            <span>Alertas típicos de {animalSel.linhagem}: <strong>{alertas.join(", ")}</strong> | Idade: <strong>{calcIdadeApenasMeses(animalSel.data_nascimento)}</strong></span>
           </div>
         )}
       </SecaoForm>
@@ -837,7 +949,33 @@ function AtendimentoForm({ inicial, animais, onSalvar, onCancelar }) {
 
       <SecaoForm titulo="Conduta e tratamento">
         <Field label="Conduta"><TextArea value={f.conduta} onChange={(e) => upd("conduta", e.target.value)} /></Field>
-        <Field label="Tratamento"><TextArea value={f.tratamento} onChange={(e) => upd("tratamento", e.target.value)} /></Field>
+        <Field label="Tratamento Geral"><TextArea value={f.tratamento} onChange={(e) => upd("tratamento", e.target.value)} /></Field>
+        
+        {/* Alteração 2: Inclusão do Módulo VetSmart de medicação */}
+        <div className="border-t border-gray-200 pt-4 mt-2">
+          <span className="block text-xs font-semibold uppercase tracking-wide text-[#4A7C7C] mb-3">Farmacologia Médica (VetSmart)</span>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Field label="Medicamento">
+              <TextInput placeholder="Ex: Meloxicam" value={f.medicamento_nome} onChange={(e) => upd("medicamento_nome", e.target.value)} />
+            </Field>
+            <Field label="Dosagem">
+              <TextInput placeholder="Ex: 0,2 mg/kg" value={f.medicamento_dosagem} onChange={(e) => upd("medicamento_dosagem", e.target.value)} />
+            </Field>
+            <Field label="Via de Administração">
+              <Select value={f.medicamento_via} onChange={(e) => upd("medicamento_via", e.target.value)}>
+                <option value="">Selecione...</option>
+                <option value="VO">Via Oral (VO)</option>
+                <option value="SC">Subcutânea (SC)</option>
+                <option value="IP">Intraperitoneal (IP)</option>
+                <option value="IM">Intramuscular (IM)</option>
+                <option value="IV">Intravenosa (IV)</option>
+              </Select>
+            </Field>
+            <Field label="Frequência (Vezes ao dia)">
+              <TextInput placeholder="Ex: SID, BID, QID" value={f.medicamento_frequencia} onChange={(e) => upd("medicamento_frequencia", e.target.value)} />
+            </Field>
+          </div>
+        </div>
       </SecaoForm>
 
       <SecaoForm titulo="Evolução clínica">
@@ -873,33 +1011,6 @@ function AtendimentoForm({ inicial, animais, onSalvar, onCancelar }) {
 // ---------------------------------------------------------------------------
 // Módulo Reprodução
 // ---------------------------------------------------------------------------
-
-function calcIdade(dataNasc) {
-  if (!dataNasc) return null;
-  const nasc = new Date(dataNasc + "T00:00:00");
-  const hoje = new Date();
-  let meses = (hoje.getFullYear() - nasc.getFullYear()) * 12 + (hoje.getMonth() - nasc.getMonth());
-  if (hoje.getDate() < nasc.getDate()) meses--;
-  if (meses < 0) return null;
-  if (meses < 1) return "< 1 mês";
-  const anos = Math.floor(meses / 12);
-  const restoMeses = meses % 12;
-  if (anos === 0) return `${meses} ${meses === 1 ? "mês" : "meses"}`;
-  return `${anos}a ${restoMeses}m`;
-}
-
-function totaisNinhadas(ninhadas = []) {
-  return ninhadas.reduce(
-    (acc, n) => ({
-      nascidos: acc.nascidos + (Number(n.n_nascidos) || 0),
-      machos: acc.machos + (Number(n.n_machos) || 0),
-      femeas: acc.femeas + (Number(n.n_femeas) || 0),
-      mortos: acc.mortos + (Number(n.n_mortos) || 0),
-      desmamados: acc.desmamados + (Number(n.n_desmamados) || 0),
-    }),
-    { nascidos: 0, machos: 0, femeas: 0, mortos: 0, desmamados: 0 }
-  );
-}
 
 function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
   const [form, setForm] = useState(null);
@@ -946,7 +1057,7 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3">
                       <SipBadge sip={r.sip} linhagem={animal?.linhagem} />
-                      {r.sip_parceiro && <span className="text-xs text-[#8A8574]">× {r.sip_parceiro}</span>}
+                      {r.reprodutor_id && <span className="text-xs text-[#8A8574]">× Macho Reprodutor: <strong>{r.reprodutor_id}</strong></span>}
                       {encerrado && <span className="text-xs px-2 py-0.5 rounded-full bg-[#A6493C]/10 text-[#A6493C]">Encerrada</span>}
                     </div>
                     <ChevronRight size={16} className={`text-[#B5AF9E] transition-transform ${isAberto ? "rotate-90" : ""}`} />
@@ -991,19 +1102,22 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
                       </div>
                     )}
 
-                    <DetalheCampo label="Genealogia" valor={r.genealogia} />
+                    <DetalheCampo label="Genealogia Básica" valor={r.genealogia} />
                     <DetalheCampo label="Intercorrências" valor={r.intercorrencias} />
                     <DetalheCampo label="Tratamentos" valor={r.tratamentos} />
 
                     {r.monitoramento?.filter((m) => m.data).length > 0 && (
                       <div className="mb-2">
-                        <span className="block text-xs font-semibold uppercase tracking-wide text-[#5C5C52] mb-1">Monitoramento</span>
-                        <div className="flex flex-wrap gap-2">
+                        <span className="block text-xs font-semibold uppercase tracking-wide text-[#5C5C52] mb-1">Monitoramento Periódico do Casal</span>
+                        <div className="space-y-1.5">
                           {r.monitoramento.filter((m) => m.data).map((m, i) => (
-                            <span key={i} className="text-xs bg-[#F7F5F0] rounded px-2 py-1 text-[#5C5C52]">
-                              {fmtDate(m.data)}{m.peso ? ` · ${m.peso}g` : ""}{m.bcs ? ` · BCS ${m.bcs}` : ""}
-                              {m.observacoes ? ` · ${m.observacoes}` : ""}
-                            </span>
+                            <div key={i} className="text-xs bg-[#F7F5F0] rounded p-2 text-[#5C5C52]">
+                              <div><strong>Data:</strong> {fmtDate(m.data)} {m.observacoes ? ` | Nota: ${m.observacoes}` : ""}</div>
+                              <div className="flex gap-4 mt-0.5">
+                                <span>Matriz: {m.peso ? `${m.peso}g` : "—"} (BCS {m.bcs || "—"})</span>
+                                <span>Reprodutor: {m.macho_peso ? `${m.macho_peso}g` : "—"} (BCS {m.macho_bcs || "—"})</span>
+                              </div>
+                            </div>
                           ))}
                         </div>
                       </div>
@@ -1032,10 +1146,10 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
 
 function ReproducaoForm({ inicial, animais, onSalvar, onCancelar }) {
   const [f, setF] = useState({
-    sip: "", sip_parceiro: "", genealogia: "",
+    sip: "", reprodutor_id: "", genealogia: "",
     historico_clinico: "", intercorrencias: "", tratamentos: "",
     ninhadas: [{ data: "", n_nascidos: "", n_machos: "", n_femeas: "", n_mortos: "", n_desmamados: "", observacoes: "" }],
-    monitoramento: [{ data: "", peso: "", bcs: "3", observacoes: "" }],
+    monitoramento: [{ data: "", peso: "", bcs: "3", macho_peso: "", macho_bcs: "3", observacoes: "" }],
     data_encerramento: "", motivo_encerramento: "",
     ...inicial,
   });
@@ -1065,7 +1179,7 @@ function ReproducaoForm({ inicial, animais, onSalvar, onCancelar }) {
     });
   }
   function addMonit() {
-    setF((s) => ({ ...s, monitoramento: [...s.monitoramento, { data: "", peso: "", bcs: "3", observacoes: "" }] }));
+    setF((s) => ({ ...s, monitoramento: [...s.monitoramento, { data: "", peso: "", bcs: "3", macho_peso: "", macho_bcs: "3", observacoes: "" }] }));
   }
   function rmMonit(i) {
     setF((s) => ({ ...s, monitoramento: s.monitoramento.filter((_, idx) => idx !== i) }));
@@ -1079,28 +1193,34 @@ function ReproducaoForm({ inicial, animais, onSalvar, onCancelar }) {
   }
 
   const femeas = animais.filter((a) => a.sexo === "Fêmea");
+  const machos = animais.filter((a) => a.sexo === "Macho");
   const animalSel = animais.find((a) => a.sip === f.sip);
 
   return (
     <form onSubmit={submit} className="bg-white border border-[#E4E0D4] rounded-lg p-5 mb-5">
-      <SecaoForm titulo="Identificação">
+      <SecaoForm titulo="Identificação do Casal">
         <div className="grid grid-cols-2 gap-x-4">
-          <Field label="Matriz (SIP)" required>
+          <Field label="Matriz (SIP - Fêmea)" required>
             <Select value={f.sip} onChange={(e) => upd("sip", e.target.value)}>
               <option value="">Selecione…</option>
               {femeas.map((a) => <option key={a.sip} value={a.sip}>{a.sip}</option>)}
             </Select>
           </Field>
-          <Field label="Parceiro (SIP)">
-            <TextInput value={f.sip_parceiro} onChange={(e) => upd("sip_parceiro", e.target.value)} placeholder="Opcional" />
+          
+          {/* Alteração 3: Inclusão estruturada e explícita do Reprodutor Macho */}
+          <Field label="Reprodutor (SIP - Macho)">
+            <Select value={f.reprodutor_id} onChange={(e) => upd("reprodutor_id", e.target.value)}>
+              <option value="">Selecione…</option>
+              {machos.map((a) => <option key={a.sip} value={a.sip}>{a.sip}</option>)}
+            </Select>
           </Field>
         </div>
         {animalSel && (
           <p className="text-xs text-[#8A8574] -mt-2 mb-3">
-            {animalSel.linhagem} · idade atual: {calcIdade(animalSel.data_nascimento) || "—"}
+            Linhagem da matriz: {animalSel.linhagem} · Idade calculada: {calcIdadeApenasMeses(animalSel.data_nascimento)}
           </p>
         )}
-        <Field label="Genealogia (pais / linhagem de origem)">
+        <Field label="Genealogia (Módulo de rastreio de pais / ninhagem)">
           <TextArea value={f.genealogia} onChange={(e) => upd("genealogia", e.target.value)} placeholder="Ex: filha de BC_WI_004.25 × BC_WI_009.25" />
         </Field>
       </SecaoForm>
@@ -1151,21 +1271,41 @@ function ReproducaoForm({ inicial, animais, onSalvar, onCancelar }) {
         <Field label="Tratamentos realizados"><TextArea value={f.tratamentos} onChange={(e) => upd("tratamentos", e.target.value)} /></Field>
       </SecaoForm>
 
-      <SecaoForm titulo="Monitoramento periódico">
-        <div className="space-y-2 mb-3">
+      {/* Alteração 3 (Espelhada): Avaliação Periódica valendo com mesmo peso para Macho e Fêmea */}
+      <SecaoForm titulo="Avaliação Periódica do Casal Reprodutor">
+        <div className="space-y-3 mb-3">
           {f.monitoramento.map((m, i) => (
-            <div key={i} className="grid grid-cols-[1fr_1fr_1fr_2fr_auto] gap-2 items-start bg-[#F7F5F0] rounded-md p-3">
-              <TextInput type="date" value={m.data} onChange={(e) => updMonit(i, "data", e.target.value)} placeholder="Data" />
-              <TextInput type="text" value={m.peso} onChange={(e) => updMonit(i, "peso", e.target.value)} placeholder="Peso (g)" />
-              <Select value={m.bcs} onChange={(e) => updMonit(i, "bcs", e.target.value)}>
-                {BCS_OPCOES.map((o) => <option key={o.v} value={o.v}>{o.label}</option>)}
-              </Select>
-              <TextInput value={m.observacoes} onChange={(e) => updMonit(i, "observacoes", e.target.value)} placeholder="Observações" />
-              <button type="button" onClick={() => rmMonit(i)} className="text-[#A6493C] p-2"><X size={14} /></button>
+            <div key={i} className="bg-[#F7F5F0] border border-gray-200 rounded-md p-4 space-y-3">
+              <div className="grid grid-cols-[1fr_2fr_auto] gap-2 items-center">
+                <TextInput type="date" value={m.data} onChange={(e) => updMonit(i, "data", e.target.value)} />
+                <TextInput value={m.observacoes} onChange={(e) => updMonit(i, "observacoes", e.target.value)} placeholder="Notas de acompanhamento" />
+                <button type="button" onClick={() => rmMonit(i)} className="text-[#A6493C] p-2"><X size={14} /></button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="p-2 bg-pink-50/50 rounded border border-pink-100">
+                  <span className="block text-[11px] uppercase font-bold text-pink-700 mb-1.5">Métrica da Matriz (Fêmea)</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <TextInput type="text" value={m.peso} onChange={(e) => updMonit(i, "peso", e.target.value)} placeholder="Peso (g)" />
+                    <Select value={m.bcs} onChange={(e) => updMonit(i, "bcs", e.target.value)}>
+                      {BCS_OPCOES.map((o) => <option key={o.v} value={o.v}>{o.label}</option>)}
+                    </Select>
+                  </div>
+                </div>
+                <div className="p-2 bg-blue-50/50 rounded border border-blue-100">
+                  <span className="block text-[11px] uppercase font-bold text-blue-700 mb-1.5">Métrica do Reprodutor (Macho)</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <TextInput type="text" value={m.macho_peso} onChange={(e) => updMonit(i, "macho_peso", e.target.value)} placeholder="Peso (g)" />
+                    <Select value={m.macho_bcs} onChange={(e) => updMonit(i, "macho_bcs", e.target.value)}>
+                      {BCS_OPCOES.map((o) => <option key={o.v} value={o.v}>{o.label}</option>)}
+                    </Select>
+                  </div>
+                </div>
+              </div>
             </div>
           ))}
         </div>
-        <Btn type="button" variant="ghost" onClick={addMonit}><Plus size={14} /> Adicionar registro</Btn>
+        <Btn type="button" variant="ghost" onClick={addMonit}><Plus size={14} /> Adicionar registro periódico</Btn>
       </SecaoForm>
 
       <SecaoForm titulo="Encerramento reprodutivo (se aplicável)">
@@ -1215,7 +1355,7 @@ function ModuloNecropsias({ necropsias, animais, reload, showToast }) {
 
   async function excluir(id) {
     await deleteRecord("necropsias", "id", id);
-    showToast("Necropsia excluída");
+    showToast("Necropsia excluído");
     reload();
   }
 
@@ -1412,8 +1552,34 @@ function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, necropsias, vo
       <div className="flex items-center gap-3 mb-1">
         <SipBadge sip={animal.sip} linhagem={animal.linhagem} />
         <span className="text-sm text-[#5C5C52]">{animal.linhagem} · {animal.sexo}</span>
+        {animal.categoria && <span className="text-xs bg-gray-200/80 px-2 py-0.5 rounded text-gray-700 font-medium">{animal.categoria}</span>}
       </div>
-      <p className="text-xs text-[#B5AF9E] mb-4">Nascimento: {fmtDate(animal.data_nascimento)} · Status: {animal.status}</p>
+      
+      {/* Alteração 4: Idade em meses exposta em tempo real */}
+      <div className="text-xs text-[#B5AF9E] mb-4 space-y-0.5">
+        <div><strong>Data de Nascimento:</strong> {fmtDate(animal.data_nascimento)}</div>
+        <div><strong>Idade do Espécime:</strong> {calcIdadeApenasMeses(animal.data_nascimento)}</div>
+        <div><strong>Status no Sistema:</strong> {animal.status}</div>
+        {animal.origem && <div><strong>Origem Cadastrada:</strong> {animal.origem}</div>}
+      </div>
+
+      {animal.categoria === "Experimentação" && animal.ceua_protocolo && (
+        <div className="bg-blue-50 text-blue-900 p-3 rounded-lg border border-blue-200 text-xs mb-4 space-y-0.5">
+          <div className="font-bold text-sm uppercase tracking-wider mb-1 text-blue-900">Vínculo Institucional CEUA</div>
+          <div><strong>Protocolo:</strong> {animal.ceua_protocolo}</div>
+          <div><strong>Professor:</strong> {animal.ceua_professor || "—"}</div>
+          <div><strong>Pesquisador Resp:</strong> {animal.ceua_pesquisador || "—"}</div>
+        </div>
+      )}
+
+      {/* Exibição da Genealogia estendida com os avós */}
+      {(animal.avos_maternos || animal.avos_paternos) && (
+        <div className="bg-gray-50 text-gray-700 p-3 rounded-lg border border-gray-200 text-xs mb-4 space-y-1">
+          <div className="font-bold uppercase text-gray-600 mb-0.5">Rastreabilidade Genética Estendida</div>
+          {animal.avos_maternos && <div><strong>Avós Maternos:</strong> {animal.avos_maternos}</div>}
+          {animal.avos_paternos && <div><strong>Avós Paternos:</strong> {animal.avos_paternos}</div>}
+        </div>
+      )}
 
       {alertas.length > 0 && (
         <div className="flex items-start gap-2 bg-[#C9852B]/10 border border-[#C9852B]/40 rounded-md px-3 py-2 mb-5 text-sm text-[#8A5E1F] w-fit">
@@ -1427,7 +1593,8 @@ function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, necropsias, vo
           seusAtendimentos.map((r) => (
             <div key={r.id} className="border-b border-[#E4E0D4] last:border-0 py-2">
               <p className="text-xs text-[#B5AF9E]">{fmtDate(r.data)}{r.peso ? ` · ${r.peso}g` : ""}{r.temperatura ? ` · ${r.temperatura}°C` : ""}</p>
-              <p className="text-sm">{r.diagnostico || "—"}</p>
+              <p className="text-sm font-medium">{r.diagnostico || "—"}</p>
+              {r.medicamento_nome && <p className="text-xs text-gray-600">Prescrição: {r.medicamento_nome} {r.medicamento_dosagem ? `(${r.medicamento_dosagem})` : ""} - {r.medicamento_frequencia}</p>}
             </div>
           ))
         )}
@@ -1440,7 +1607,7 @@ function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, necropsias, vo
             return (
               <div key={r.id} className="border-b border-[#E4E0D4] last:border-0 py-2">
                 <p className="text-sm">
-                  {r.ninhadas?.length || 0} ninhada(s) · {tot.nascidos} nascidos{r.sip_parceiro ? ` · parceiro ${r.sip_parceiro}` : ""}
+                  {r.ninhadas?.length || 0} ninhada(s) · {tot.nascidos} nascidos{r.reprodutor_id ? ` · Reprodutor Macho: ${r.reprodutor_id}` : ""}
                   {r.data_encerramento ? " · encerrada" : ""}
                 </p>
               </div>
