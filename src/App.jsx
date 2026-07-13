@@ -423,7 +423,7 @@ function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparF
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-gray-500">Mapeamento de Espécimes</h2>
+        <h2 className="text-sm font-bold uppercase tracking-wider text-gray-500">Espécies</h2>
         <Btn onClick={() => { setForm({ status: "Ativo", especie: "Rato", linhagem: "Wistar", categoria: "Matriz", origem: "Biotério Central" }); limparForcarEdicao(); }}><Plus size={13} /> Cadastrar Animal</Btn>
       </div>
 
@@ -432,17 +432,18 @@ function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparF
           e.preventDefault();
           if (!form.sip?.trim()) return alert("Código SIP é obrigatório.");
           
-          // CRUCIAL: Aqui adaptamos os nomes dos campos para o Supabase
-          const payload = {
-              ...form,
-              mae_id: form.mae_id || null,
-              pai_id: form.pai_id || null,
-              responsavel_tecnico: form.responsavel_tecnico || null,
-              ceua_protocolo: form.ceua_protocolo || null
-          };
-
-          await saveRecord("animais", payload);
-          setForm(null); limparForcarEdicao(); showToast("Registro salvo com sucesso"); reload();
+          const { created_at, ...dadosParaSalvar } = form;
+          
+          try {
+            await saveRecord("animais", dadosParaSalvar);
+            setForm(null); 
+            limparForcarEdicao(); 
+            showToast("Registro salvo com sucesso"); 
+            reload();
+          } catch (err) {
+            console.error(err);
+            alert("Erro ao salvar: " + (err.message || "Verifique os campos obrigatórios."));
+          }
         }} className="bg-white border rounded-lg p-5 space-y-4 shadow-sm text-left">
           
           <div className="border-b pb-1 mb-2">
@@ -455,9 +456,7 @@ function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparF
             <Field label="Sexo Anatômico"><Select value={form.sexo || "Fêmea"} onChange={e => setForm({...form, sexo: e.target.value})}><option>Fêmea</option><option>Macho</option></Select></Field>
             <Field label="Categoria Biotécnica"><Select value={form.categoria || "Matriz"} onChange={e => setForm({...form, categoria: e.target.value})}><option>Matriz</option><option>Reprodutor</option><option>Manutenção</option><option>Experimentação</option></Select></Field>
             <Field label="Data Nascimento"><TextInput type="date" value={form.data_nascimento || ""} onChange={e => setForm({...form, data_nascimento: e.target.value})} /></Field>
-            
             <Field label="Origem do Animal"><Select value={form.origem || "Biotério Central"} onChange={e => setForm({...form, origem: e.target.value})}><option>Biotério Central</option><option>Biotério LENq</option><option>Biotério PPGBIOEF</option><option>Biotério LABMAT</option><option>Outro</option></Select></Field>
-            
             <Field label="Status Cadastral"><Select value={form.status || "Ativo"} onChange={e => setForm({...form, status: e.target.value})}><option>Ativo</option><option>Óbito</option><option>Eutanásia</option></Select></Field>
           </div>
 
@@ -465,16 +464,16 @@ function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparF
             <span className="text-xs font-bold uppercase text-[#4A7C7C]">Filiação e Responsabilidade</span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <Field label="Código SIP da Mãe (Matriz)"><TextInput value={form.mae_id || ""} onChange={e => setForm({...form, mae_id: e.target.value})} placeholder="Ex: SIP da Mãe" /></Field>
-            <Field label="Código SIP do Pai (Reprodutor)"><TextInput value={form.pai_id || ""} onChange={e => setForm({...form, pai_id: e.target.value})} placeholder="Ex: SIP do Pai" /></Field>
-            <Field label="Responsável Técnico / Pesquisador"><TextInput value={form.responsavel_tecnico || ""} onChange={e => setForm({...form, responsavel_tecnico: e.target.value})} placeholder="Nome do pesquisador responsável" /></Field>
+            <Field label="Código SIP da Mãe (Matriz)"><TextInput value={form.mae_id || ""} onChange={e => setForm({...form, mae_id: e.target.value})} /></Field>
+            <Field label="Código SIP do Pai (Reprodutor)"><TextInput value={form.pai_id || ""} onChange={e => setForm({...form, pai_id: e.target.value})} /></Field>
+            <Field label="Responsável Técnico / Pesquisador"><TextInput value={form.responsavel_tecnico || ""} onChange={e => setForm({...form, responsavel_tecnico: e.target.value})} /></Field>
             
             {form.categoria === "Experimentação" && (
-              <Field label="Número Protocolo CEUA" required><TextInput value={form.ceua_protocolo || ""} onChange={e => setForm({...form, ceua_protocolo: e.target.value})} placeholder="Ex: 12345/2026" /></Field>
+              <Field label="Número Protocolo CEUA" required><TextInput value={form.protocolo_ceua || ""} onChange={e => setForm({...form, protocolo_ceua: e.target.value})} placeholder="Ex: 12345/2026" /></Field>
             )}
           </div>
 
-          <Field label="Notas Adicionais / Observações Gênicas"><TextArea value={form.observacoes || ""} onChange={e => setForm({...form, observacoes: e.target.value})} placeholder="Escreva detalhes de linhagem, progênie, mutações estruturais..." /></Field>
+          <Field label="Notas Adicionais / Observações Gênicas"><TextArea value={form.observacoes || ""} onChange={e => setForm({...form, observacoes: e.target.value})} /></Field>
           <div className="flex gap-2 pt-2 border-t"><Btn type="submit">Salvar Cadastro</Btn><Btn type="button" variant="ghost" onClick={() => { setForm(null); limparForcarEdicao(); }}>Cancelar</Btn></div>
         </form>
       )}
