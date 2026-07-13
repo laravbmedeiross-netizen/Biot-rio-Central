@@ -408,7 +408,7 @@ function Dashboard({ animais, atendimentos, necropsias, reproducoes, goTo }) {
 }
 
 // ---------------------------------------------------------------------------
-// Módulo Animais (Com Diagnóstico Detalhado do Banco)
+// Módulo Animais (Com Mapeamento Exato das Colunas do seu Supabase)
 // ---------------------------------------------------------------------------
 function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparForcarEdicao }) {
   const [form, setForm] = useState(null);
@@ -416,13 +416,15 @@ function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparF
 
   useEffect(() => { 
     if (forcarEdicao) {
+      // Mapeia o que vem do banco para os estados do formulário local
       setForm({
         ...forcarEdicao,
         origem: forcarEdicao.origem || "Biotério Central",
         responsavel_tecnico: forcarEdicao.responsavel_tecnico || "",
-        protocolo_ceua: forcarEdicao.protocolo_ceua || "",
-        mae_id: forcarEdicao.mae_id || "",
-        pai_id: forcarEdicao.pai_id || ""
+        // Lê de forma segura indepedente de como o nome da coluna de filiação veio
+        mae_id: forcarEdicao.mae_id || forcarEdicao["mãe_id"] || "",
+        pai_id: forcarEdicao.pai_id || "",
+        protocolo_ceua: forcarEdicao.ceua_protocolo || ""
       }); 
     } 
   }, [forcarEdicao]);
@@ -452,21 +454,36 @@ function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparF
             return;
           }
 
-          // Prepara objeto limpando strings vazias para enviar nulo válido ao banco
+          // MONTA O PAYLOAD ESPELHANDO EXATAMENTE SUAS COLUNAS DO SUPABASE
           const payload = {
-            ...form,
-            mae_id: form.mae_id?.trim() || null,
-            pai_id: form.pai_id?.trim() || null,
+            sip: form.sip,
+            especie: form.especie,
+            linhagem: form.linhagem,
+            sexo: form.sexo,
+            categoria: form.categoria,
+            data_nascimento: form.data_nascimento || null,
+            origem: form.origem,
+            status: form.status,
+            observacoes: form.observacoes || null,
+            
+            // Colunas novas mapeadas perfeitamente conforme suas fotos:
             responsavel_tecnico: form.responsavel_tecnico?.trim() || null,
-            protocolo_ceua: form.protocolo_ceua?.trim() || null,
-            origem: form.origem || "Biotério Central"
+            pai_id: form.pai_id?.trim() || null,
+            ceua_protocolo: form.protocolo_ceua?.trim() || null,
+            
+            // Tratamento preventivo para salvar independente de ter acento ou não no banco
+            "mãe_id": form.mae_id?.trim() || null,
+            mae_id: form.mae_id?.trim() || null
           };
+
+          // Mantém as referências geradas pelo Supabase na edição
+          if (form.created_at) payload.created_at = form.created_at;
+          if (form.id) payload.id = form.id;
 
           try {
             const { error } = await supabase.from("animais").upsert(payload);
             if (error) {
-              // Exibe o erro exato retornado pela tabela do Supabase
-              alert(`Erro no Banco do Supabase:\nCódigo: ${error.code}\nMensagem: ${error.message}\n\nDica: Verifique se as colunas mae_id, pai_id, origem, responsavel_tecnico ou protocolo_ceua existem exatamente com esses nomes minúsculos na estrutura da sua tabela.`);
+              alert(`Erro no Banco do Supabase:\nCódigo: ${error.code}\nMensagem: ${error.message}`);
               return;
             }
             setForm(null); 
@@ -1017,14 +1034,14 @@ function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, voltar, onEdit
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2 pt-2 border-t border-gray-100 text-xs text-gray-500">
-          <div>Matriz Mãe: <strong className="text-[#4A7C7C]">{animal.mae_id || "Não Informado"}</strong></div>
+          <div>Matriz Mãe: <strong className="text-[#4A7C7C]">{animal.mae_id || animal["mãe_id"] || "Não Informado"}</strong></div>
           <div>Reprodutor Pai: <strong className="text-[#3E5C8A]">{animal.pai_id || "Não Informado"}</strong></div>
           <div>Responsável Técnico: <strong className="text-gray-700">{animal.responsavel_tecnico || "Não Informado"}</strong></div>
         </div>
 
-        {animal.categoria === "Experimentação" && animal.protocolo_ceua && (
+        {animal.categoria === "Experimentação" && (animal.ceua_protocolo || animal.protocolo_ceua) && (
           <div className="mt-2 p-2 bg-blue-50/50 border border-blue-100 text-xs rounded text-blue-900">
-            Protocolo de Aprovação CEUA: <strong>{animal.protocolo_ceua}</strong>
+            Protocolo de Aprovação CEUA: <strong>{animal.ceua_protocolo || animal.protocolo_ceua}</strong>
           </div>
         )}
 
