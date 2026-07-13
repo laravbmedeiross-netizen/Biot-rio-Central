@@ -417,8 +417,8 @@ function BuscaResultados({ resultados, onSelect }) {
 
 function Dashboard({ animais, atendimentos, necropsias, reproducoes, goTo }) {
   const animaisAtivos = animais.filter((a) => a.status === "Ativo" || !a.status);
-  const casaisAtivos = reproducoes.filter((r) => !r.data_encoding && !r.data_encerramento);
-  const casaisInativos = reproducoes.filter((r) => !!r.data_encoding || !!r.data_encerramento);
+  const casaisAtivos = reproducoes.filter((r) => !r.data_displacement && !r.data_encerramento);
+  const casaisInativos = reproducoes.filter((r) => !!r.data_displacement || !!r.data_encerramento);
 
   const atendimentosEmAndamento = atendimentos.filter((at) => !at.desfecho || at.desfecho.trim() === "");
   const atendimentosFinalizados = atendimentos.filter((at) => at.desfecho && at.desfecho.trim() !== "");
@@ -434,7 +434,7 @@ function Dashboard({ animais, atendimentos, necropsias, reproducoes, goTo }) {
       const linhagem = animalMatriz?.linhagem || "Wistar";
       if (!LINHAGENS.includes(linhagem)) return;
 
-      const tipoStatus = (!r.data_encoding && !r.data_encerramento) ? "ativa" : "inativa";
+      const tipoStatus = (!r.data_displacement && !r.data_encerramento) ? "ativa" : "inativa";
       const totalFicha = totaisNinhadas(r.ninhadas);
 
       mapa[linhagem][tipoStatus].nascidos += totalFicha.nascidos;
@@ -523,10 +523,10 @@ function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparF
       await saveRecord("animais", dados);
       setForm(null);
       limparForcarEdicao();
-      showToast(dados.id || dados.created_at ? "Animal updated" : "Animal registered");
+      showToast(dados.id || dados.created_at ? "Animal atualizado" : "Animal cadastrado");
       reload();
     } catch {
-      showToast("Error saving");
+      showToast("Erro ao salvar");
     } finally {
       setSalvando(false);
     }
@@ -694,13 +694,13 @@ function AtendimentoForm({ inicial, animais, onSalvar, onCancelar }) {
 }
 
 // ---------------------------------------------------------------------------
-// Módulo Reprodução (Restaurado e Corrigido Lara)
+// Módulo Reprodução (Totalmente corrigido e seguro contra telas brancas)
 // ---------------------------------------------------------------------------
 
 function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
   const [form, setForm] = useState(null);
   const [aberto, setAberto] = useState(null);
-  const [abaCasais, setAbaCasais] = useState("ativos"); // ativos | inativos
+  const [abaCasais, setAbaCasais] = useState("ativos");
 
   async function salvar(dados) {
     const id = dados.id || genId("rep");
@@ -718,9 +718,8 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
     }
   }
 
-  // Separação por abas de Casal Ativo ou Inativo
   const listaExibida = reproducoes.filter((r) => {
-    const isInativo = !!r.data_encoding || !!r.data_displacement || !!r.data_encerramento;
+    const isInativo = !!r.data_displacement || !!r.data_encerramento;
     return abaCasais === "inativos" ? isInativo : !isInativo;
   });
 
@@ -736,20 +735,19 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
 
       {form && <ReproducaoForm inicial={form} animais={animais} onSalvar={salvar} onCancelar={() => setForm(null)} />}
 
-      {/* Abas Seletoras de Visualização */}
       {!form && (
         <div className="flex gap-2 border-b border-[#E4E0D4] pb-2 mb-4">
           <button
             onClick={() => setAbaCasais("ativos")}
             className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${abaCasais === "ativos" ? "bg-[#1B3A54] text-white" : "bg-white border text-[#5C5C52]"}`}
           >
-            Casais Ativos ({reproducoes.filter(r => !r.data_encoding && !r.data_displacement && !r.data_encerramento).length})
+            Casais Ativos ({reproducoes.filter(r => !r.data_displacement && !r.data_encerramento).length})
           </button>
           <button
             onClick={() => setAbaCasais("inativos")}
             className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${abaCasais === "inativos" ? "bg-amber-700 text-white" : "bg-white border text-[#5C5C52]"}`}
           >
-            Casais Inativos ({reproducoes.filter(r => r.data_encoding || r.data_displacement || r.data_encerramento).length})
+            Casais Inativos ({reproducoes.filter(r => r.data_displacement || r.data_encerramento).length})
           </button>
         </div>
       )}
@@ -761,7 +759,7 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
           {listaExibida.map((r) => {
             const animal = animais.find((a) => a.sip === r.sip);
             const tot = totaisNinhadas(r.ninhadas);
-            const encerrado = !!r.data_encoding || !!r.data_displacement || !!r.data_encerramento;
+            const encerrado = !!r.data_displacement || !!r.data_encerramento;
             const isAberto = aberto === r.id;
             
             return (
@@ -780,7 +778,6 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
                   </p>
                 </button>
 
-                {/* Exibição completa dos dados e tabelas (Lara: Funciona para Ativos E Inativos) */}
                 {isAberto && (
                   <div className="mt-3 pt-3 border-t border-[#E4E0D4] space-y-3">
                     {r.ninhadas?.filter((n) => n.data).length > 0 ? (
@@ -822,7 +819,7 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
 
                     {encerrado && (
                       <div className="bg-amber-50/60 border border-amber-200 p-2.5 rounded text-xs text-amber-900">
-                        <strong>Dados de Inativação:</strong> Encerrado em {fmtDate(r.data_encoding || r.data_displacement || r.data_recording || r.data_id || r.data_encerramento)} {r.motivo_encerramento ? `— Motivo: ${r.motivo_encerramento}` : ""}
+                        <strong>Dados de Inativação:</strong> Encerrado em {fmtDate(r.data_displacement || r.data_encerramento)} {r.motivo_encerramento ? `— Motivo: ${r.motivo_encerramento}` : ""}
                       </div>
                     )}
 
@@ -845,7 +842,7 @@ function ReproducaoForm({ inicial, animais, onSalvar, onCancelar }) {
   const [f, setF] = useState({
     sip: "", reprodutor_id: "", genealogia: "", historico_clinico: "", intercorrencias: "", tratamentos: "",
     ninhadas: [{ data: "", n_nascidos: "", n_machos: "", n_femeas: "", n_mortos: "", n_desmamados: "", observacoes: "" }],
-    data_encerramento: "", motivo_encerramento: "", ...inicial,
+    data_displacement: "", data_encerramento: "", motivo_encerramento: "", ...inicial,
   });
   const [erro, setErro] = useState("");
 
@@ -864,8 +861,15 @@ function ReproducaoForm({ inicial, animais, onSalvar, onCancelar }) {
     setF((s) => ({ ...s, ninhadas: f.ninhadas.filter((_, idx) => idx !== i) }));
   }
 
+  function submit(e) {
+    e.preventDefault();
+    if (!f.sip) return setErro("Selecione a matriz.");
+    setErro("");
+    onSalvar(f);
+  }
+
   return (
-    <form onSubmit={(e) => { e.preventDefault(); if (!f.sip) return setErro("Selecione a matriz."); onSalvar(f); }} className="bg-white border rounded-lg p-5 space-y-4">
+    <form onSubmit={submit} className="bg-white border rounded-lg p-5 space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <Field label="Matriz (Fêmea)" required>
           <Select value={f.sip} onChange={(e) => upd("sip", e.target.value)}>
@@ -903,7 +907,9 @@ function ReproducaoForm({ inicial, animais, onSalvar, onCancelar }) {
       </div>
 
       <div className="border-t pt-3 grid grid-cols-2 gap-4">
-        <Field label="Data Encerramento do Casal"><TextInput type="date" value={f.data_encoding || f.data_displacement || f.data_id || f.data_encerramento || ""} onChange={(e) => upd("data_encerramento", e.target.value)} /></Field>
+        <Field label="Data Encerramento do Casal">
+          <TextInput type="date" value={f.data_displacement || f.data_id || f.data_encerramento || ""} onChange={(e) => { upd("data_encerramento", e.target.value); upd("data_displacement", e.target.value); }} />
+        </Field>
         <Field label="Motivo da Inativação"><TextInput value={f.motivo_encerramento || ""} onChange={(e) => upd("motivo_encerramento", e.target.value)} placeholder="Ex: Idade avançada, descarte, óbito" /></Field>
       </div>
 
@@ -1030,7 +1036,6 @@ function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, necropsias, vo
 
   const seusAtendimentos = atendimentos.filter((a) => a.sip === sip);
   const seuProntuario = reproducoes.filter((r) => r.sip === sip || r.reprodutor_id === sip);
-  const suaNecropsia = necropsias.filter((n) => n.sip === sip);
 
   return (
     <div>
