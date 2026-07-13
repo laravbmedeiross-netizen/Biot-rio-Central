@@ -25,7 +25,7 @@ const CROMO_OPCOES = [
   { v: "0", label: "0 — Ausente / Sem alterações" },
   { v: "1", label: "1 — Leve" },
   { v: "2", label: "2 — Moderada" },
-  { v: "3", size: "3 — Severa" },
+  { v: "3", label: "3 — Severa" },
 ];
 
 const MODULOS = [
@@ -408,12 +408,25 @@ function Dashboard({ animais, atendimentos, necropsias, reproducoes, goTo }) {
 }
 
 // ---------------------------------------------------------------------------
-// Módulo Animais (Com Seleção das Unidades Oficiais de Biotérios da UFRN)
+// Módulo Animais (Com Alertas de Validação CEUA no Envio)
 // ---------------------------------------------------------------------------
 function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparForcarEdicao }) {
   const [form, setForm] = useState(null);
   const [abaAnimais, setAbaAnimais] = useState("ativos");
-  useEffect(() => { if (forcarEdicao) setForm(forcarEdicao); }, [forcarEdicao]);
+
+  // Garante que o formulário de edição inicialize corretamente com strings limpas
+  useEffect(() => { 
+    if (forcarEdicao) {
+      setForm({
+        ...forcarEdicao,
+        origem: forcarEdicao.origem || "Biotério Central",
+        responsavel_tecnico: forcarEdicao.responsavel_tecnico || "",
+        protocolo_ceua: forcarEdicao.protocolo_ceua || "",
+        mae_id: forcarEdicao.mae_id || "",
+        pai_id: forcarEdicao.pai_id || ""
+      }); 
+    } 
+  }, [forcarEdicao]);
 
   const filtrados = animais.filter(a => {
     const isAtivo = a.status === "Ativo" || !a.status;
@@ -424,15 +437,32 @@ function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparF
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-sm font-bold uppercase tracking-wider text-gray-500">Mapeamento de Espécimes</h2>
-        <Btn onClick={() => { setForm({ status: "Ativo", especie: "Rato", linhagem: "Wistar", categoria: "Matriz", origem: "Biotério Central" }); limparForcarEdicao(); }}><Plus size={13} /> Cadastrar Animal</Btn>
+        <Btn onClick={() => { setForm({ status: "Ativo", especie: "Rato", linhagem: "Wistar", categoria: "Matriz", origem: "Biotério Central", mae_id: "", pai_id: "", responsavel_tecnico: "", protocolo_ceua: "" }); limparForcarEdicao(); }}><Plus size={13} /> Cadastrar Animal</Btn>
       </div>
 
       {form && (
         <form onSubmit={async e => {
           e.preventDefault();
-          if (!form.sip?.trim()) return alert("Código SIP é obrigatório.");
-          await saveRecord("animais", form);
-          setForm(null); limparForcarEdicao(); showToast("Registro salvo com sucesso"); reload();
+          if (!form.sip?.trim()) {
+            alert("O Código SIP Identificador é obrigatório.");
+            return;
+          }
+          
+          // Alerta Visual: Se for Experimentação, o Protocolo CEUA passa a ser OBRIGATÓRIO
+          if (form.categoria === "Experimentação" && !form.protocolo_ceua?.trim()) {
+            alert("Atenção Lara! Animais na categoria de 'Experimentação' exigem obrigatoriamente o preenchimento do Número do Protocolo CEUA.");
+            return;
+          }
+
+          try {
+            await saveRecord("animais", form);
+            setForm(null); 
+            limparForcarEdicao(); 
+            showToast("Registro salvo com sucesso"); 
+            reload();
+          } catch (err) {
+            alert("Erro ao comunicar com o banco de dados. Verifique a conexão.");
+          }
         }} className="bg-white border rounded-lg p-5 space-y-4 shadow-sm text-left">
           
           <div className="border-b pb-1 mb-2">
@@ -446,9 +476,7 @@ function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparF
             <Field label="Categoria Biotécnica"><Select value={form.categoria || "Matriz"} onChange={e => setForm({...form, categoria: e.target.value})}><option>Matriz</option><option>Reprodutor</option><option>Manutenção</option><option>Experimentação</option></Select></Field>
             <Field label="Data Nascimento"><TextInput type="date" value={form.data_nascimento || ""} onChange={e => setForm({...form, data_nascimento: e.target.value})} /></Field>
             
-            {/* Campo Origem Atualizado com a Lista Real de Unidades */}
             <Field label="Origem do Animal"><Select value={form.origem || "Biotério Central"} onChange={e => setForm({...form, origem: e.target.value})}><option>Biotério Central</option><option>Biotério LENq</option><option>Biotério PPGBIOEF</option><option>Biotério LABMAT</option><option>Outro</option></Select></Field>
-            
             <Field label="Status Cadastral"><Select value={form.status || "Ativo"} onChange={e => setForm({...form, status: e.target.value})}><option>Ativo</option><option>Óbito</option><option>Eutanásia</option></Select></Field>
           </div>
 
@@ -460,7 +488,6 @@ function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparF
             <Field label="Código SIP do Pai (Reprodutor)"><TextInput value={form.pai_id || ""} onChange={e => setForm({...form, pai_id: e.target.value})} placeholder="Ex: SIP do Pai" /></Field>
             <Field label="Responsável Técnico / Pesquisador"><TextInput value={form.responsavel_tecnico || ""} onChange={e => setForm({...form, responsavel_tecnico: e.target.value})} placeholder="Nome do pesquisador responsável" /></Field>
             
-            {/* Protocolo CEUA aparece apenas para Experimentação */}
             {form.categoria === "Experimentação" && (
               <Field label="Número Protocolo CEUA" required><TextInput value={form.protocolo_ceua || ""} onChange={e => setForm({...form, protocolo_ceua: e.target.value})} placeholder="Ex: 12345/2026" /></Field>
             )}
@@ -497,7 +524,7 @@ function ModuloAtendimentos({ atendimentos, animais, reload, showToast }) {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-gray-500">Fichas de Intervenção Clínica</h2>
+        <h2 className="text-sm font-bold uppercase tracking-wider text-gray-500">Fichas de Intervenção Clinical</h2>
         <Btn onClick={() => setForm({
           tratamentos: [], procedimentos: [], reavaliacoes: [],
           escore_corporal: "BC3", cromo: "0"
@@ -705,7 +732,7 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
       )}
 
       <div className="flex gap-2 border-b pb-2">
-        <button onClick={() => setAba("ativos")} className={`px-3 py-1.5 text-xs font-bold rounded ${aba === "ativos" ? "bg-[#1B3A54] text-white" : "bg-white border text-gray-500"}`}>Casais em Production Ativa ({reproducoes.filter(r => !r.term_data_matriz && !r.term_data_reprodutor).length})</button>
+        <button onClick={() => setAba("ativos")} className={`px-3 py-1.5 text-xs font-bold rounded ${aba === "ativos" ? "bg-[#1B3A54] text-white" : "bg-white border text-gray-500"}`}>Casais em Produção Ativa ({reproducoes.filter(r => !r.term_data_matriz && !r.term_data_reprodutor).length})</button>
         <button onClick={() => setAba("inativos")} className={`px-3 py-1.5 text-xs font-bold rounded ${aba === "inativos" ? "bg-amber-800 text-white" : "bg-white border text-gray-500"}`}>Colônias Desativadas ({reproducoes.filter(r => r.term_data_matriz || r.term_data_reprodutor).length})</button>
       </div>
 
@@ -950,6 +977,7 @@ function NecropsiaFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
 // ---------------------------------------------------------------------------
 // Perfil Consolidado (Animal Perfil)
 // ---------------------------------------------------------------------------
+// ... [O restante do arquivo permanece igual e protegido]
 function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, voltar, onEditarAnimal, onExcluirAnimal }) {
   const animal = animais.find(a => a.sip === sip);
   if (!animal) return <p className="text-sm p-6 text-gray-400">Animal não localizado no banco central.</p>;
