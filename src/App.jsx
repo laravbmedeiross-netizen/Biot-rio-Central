@@ -758,8 +758,8 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
                     <div className="border rounded overflow-hidden shadow-inner">
                       <div className="bg-gray-100 p-2 font-bold text-gray-600">Histórico Cronológico de Linhadas</div>
                       <table className="w-full text-left bg-white">
-                        <thead><tr className="bg-gray-50 border-b text-gray-400 font-bold text-[10px]"><th className="p-1.5">Data Parto</th><th className="p-1.5 text-center">Nascidos</th><th className="p-1.5 text-center">Desmamados</th><th className="p-1.5">Observações</th></tr></thead>
-                        <tbody>{r.ninhadas.map((n, i) => <tr key={i} className="border-b"><td className="p-1.5 font-mono">{fmtDate(n.data)}</td><td className="p-1.5 text-center text-emerald-700 font-bold">{n.n_nascidos}</td><td className="p-1.5 text-center text-blue-700 font-bold">{n.n_desmamados}</td><td className="p-1.5 text-gray-500 italic">{n.obs || "—"}</td></tr>)}</tbody>
+                        <thead><tr className="bg-gray-50 border-b text-gray-400 font-bold text-[10px]"><th className="p-1.5">Data Parto</th><th className="p-1.5 text-center">Nascidos</th><th className="p-1.5 text-center">Machos</th><th className="p-1.5 text-center">Fêmeas</th><th className="p-1.5 text-center">Desmamados</th><th className="p-1.5">Observações</th></tr></thead>
+                        <tbody>{r.ninhadas.map((n, i) => <tr key={i} className="border-b"><td className="p-1.5 font-mono">{fmtDate(n.data)}</td><td className="p-1.5 text-center text-emerald-700 font-bold">{n.n_nascidos}</td><td className="p-1.5 text-center text-[#3E5C8A] font-bold">{n.n_machos || "—"}</td><td className="p-1.5 text-center text-[#7C5A94] font-bold">{n.n_femeas || "—"}</td><td className="p-1.5 text-center text-blue-700 font-bold">{n.n_desmamados}</td><td className="p-1.5 text-gray-500 italic">{n.obs || "—"}</td></tr>)}</tbody>
                       </table>
                     </div>
                   )}
@@ -822,7 +822,42 @@ function ReproducaoFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
 
       <div className="bg-gray-50 border rounded-lg p-3 space-y-2">
         <span className="block text-[11px] font-bold uppercase tracking-wider text-[#4A7C7C]">2. Histórico de Ninhadas / Partos</span>
+
+        {Array.isArray(f.ninhadas) && f.ninhadas.length > 0 && (
+          <div className="border rounded overflow-hidden bg-white">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="bg-gray-100 border-b text-gray-500 font-bold">
+                  <th className="p-1.5">Data</th>
+                  <th className="p-1.5 text-center">Nascidos</th>
+                  <th className="p-1.5 text-center">Machos</th>
+                  <th className="p-1.5 text-center">Fêmeas</th>
+                  <th className="p-1.5">Obs</th>
+                  <th className="p-1.5"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {f.ninhadas.map((n, i) => (
+                  <tr key={i} className="border-b last:border-0">
+                    <td className="p-1.5 font-mono">{fmtDate(n.data)}</td>
+                    <td className="p-1.5 text-center">{n.n_nascidos || "—"}</td>
+                    <td className="p-1.5 text-center">{n.n_machos || "—"}</td>
+                    <td className="p-1.5 text-center">{n.n_femeas || "—"}</td>
+                    <td className="p-1.5 text-gray-500">{n.obs || "—"}</td>
+                    <td className="p-1.5">
+                      <button type="button" onClick={() => setF({ ...f, ninhadas: f.ninhadas.filter((_, idx) => idx !== i) })} className="text-[#A6493C]">
+                        <X size={13} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         <div className="bg-white p-3 border rounded space-y-2">
+          <span className="block text-[10px] font-bold uppercase text-gray-400">Adicionar novo parto</span>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
             <TextInput type="date" value={linhaNinhada.data} onChange={e => setLinhaNinhada({...linhaNinhada, data: e.target.value})} />
             <TextInput type="number" placeholder="N° Nascidos" value={linhaNinhada.n_nascidos} onChange={e => setLinhaNinhada({...linhaNinhada, n_nascidos: e.target.value})} />
