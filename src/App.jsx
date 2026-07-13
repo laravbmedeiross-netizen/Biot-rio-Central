@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Search, Plus, ChevronRight, X, Save, Home, PawPrint, Stethoscope,
-  Heart, Skull, AlertTriangle, Trash2, ArrowLeft, Loader2, Check, LogOut
+  Heart, Skull, AlertTriangle, Trash2, ArrowLeft, Loader2, Check, LogOut, Edit3
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import Login from "./Login";
@@ -94,20 +94,6 @@ function fmtDate(iso) {
 }
 
 // Funções Auxiliares de Idade
-function calcIdade(dataNasc) {
-  if (!dataNasc) return null;
-  const nasc = new Date(dataNasc + "T00:00:00");
-  const hoje = new Date();
-  let meses = (hoje.getFullYear() - nasc.getFullYear()) * 12 + (hoje.getMonth() - nasc.getMonth());
-  if (hoje.getDate() < nasc.getDate()) meses--;
-  if (meses < 0) return null;
-  if (meses < 1) return "< 1 mês";
-  const anos = Math.floor(meses / 12);
-  const restoMeses = meses % 12;
-  if (anos === 0) return `${meses} ${meses === 1 ? "mês" : "meses"}`;
-  return `${anos}a ${restoMeses}m (${meses} ${meses === 1 ? "mês" : "meses"})`;
-}
-
 function calcIdadeApenasMeses(dataNasc) {
   if (!dataNasc) return "—";
   const nasc = new Date(dataNasc + "T00:00:00");
@@ -147,7 +133,6 @@ function SipBadge({ sip, linhagem }) {
   );
 }
 
-// Componente Card de Exibição Compacta do Animal
 function CardAnimalCompacto({ animal, onClick }) {
   return (
     <button 
@@ -261,6 +246,9 @@ export default function App() {
 
   const [session, setSession] = useState(undefined);
 
+  // Estado para capturar quando pedimos edição de animal direto da ficha de detalhe
+  const [animalParaEditar, setAnimalParaEditar] = useState(null);
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -333,7 +321,10 @@ export default function App() {
             return (
               <button
                 key={m.id}
-                onClick={() => setModulo(m.id)}
+                onClick={() => {
+                  setModulo(m.id);
+                  setAnimalParaEditar(null); // Reseta estados de edição ao trocar de módulo
+                }}
                 className={`w-full flex items-center gap-3 px-5 py-2.5 text-sm transition-colors ${
                   active ? "bg-white/10 text-white font-medium" : "text-[#B8CBD6] hover:bg-white/5 hover:text-white"
                 }`}
@@ -382,7 +373,14 @@ export default function App() {
               <Dashboard animais={animais} atendimentos={atendimentos} necropsias={necropsias} reproducoes={reproducoes} goTo={setModulo} />
             )}
             {modulo === "animais" && (
-              <ModuloAnimais animais={animais} reload={loadAll} showToast={showToast} goTo={setModulo} />
+              <ModuloAnimais 
+                animais={animais} 
+                reload={loadAll} 
+                showToast={showToast} 
+                goTo={setModulo}
+                forcarEdicao={animalParaEditar}
+                limparForcarEdicao={() => setAnimalParaEditar(null)}
+              />
             )}
             {modulo === "atendimentos" && (
               <ModuloAtendimentos atendimentos={atendimentos} animais={animais} reload={loadAll} showToast={showToast} />
@@ -401,6 +399,10 @@ export default function App() {
                 reproducoes={reproducoes}
                 necropsias={necropsias}
                 voltar={() => setModulo("animais")}
+                onEditarAnimal={(animalData) => {
+                  setAnimalParaEditar(animalData);
+                  setModulo("animais"); // Direciona para o módulo de animais onde o formulário abrirá em modo edição
+                }}
               />
             )}
           </div>
@@ -533,19 +535,27 @@ function Dashboard({ animais, atendimentos, necropsias, reproducoes, goTo }) {
 }
 
 // ---------------------------------------------------------------------------
-// Módulo Animais
+// Módulo Animais (Com Suporte a Edição)
 // ---------------------------------------------------------------------------
 
-function ModuloAnimais({ animais, reload, showToast, goTo }) {
+function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparForcarEdicao }) {
   const [form, setForm] = useState(null);
   const [salvando, setSalvando] = useState(false);
+
+  // Efeito para abrir o formulário automaticamente se vier uma solicitação de edição externa
+  useEffect(() => {
+    if (forcarEdicao) {
+      setForm(forcarEdicao);
+    }
+  }, [forcarEdicao]);
 
   async function salvar(dados) {
     setSalvando(true);
     try {
       await saveRecord("animais", dados);
       setForm(null);
-      showToast("Animal cadastrado");
+      limparForcarEdicao();
+      showToast(dados.id || dados.created_at ? "Animal atualizado" : "Animal cadastrado");
       reload();
     } catch {
       showToast("Erro ao salvar — confira o console");
@@ -561,10 +571,18 @@ function ModuloAnimais({ animais, reload, showToast, goTo }) {
           <h2 className="text-xl font-semibold">Animais</h2>
           <p className="text-sm text-[#8A8574]">Cadastro central por código SIP.</p>
         </div>
-        <Btn onClick={() => setForm({})}><Plus size={14} /> Novo animal</Btn>
+        <Btn onClick={() => { setForm({}); limparForcarEdicao(); }}><Plus size={14} /> Novo animal</Btn>
       </div>
 
-      {form && <AnimalForm inicial={form} animaisExistentes={animais} onSalvar={salvar} onCancelar={() => setForm(null)} salvando={salvando} />}
+      {form && (
+        <AnimalForm 
+          inicial={form} 
+          animaisExistentes={animais} 
+          onSalvar={salvar} 
+          onCancelar={() => { setForm(null); limparForcarEdicao(); }} 
+          salvando={salvando} 
+        />
+      )}
 
       {animais.length === 0 && !form ? (
         <EmptyState icon={PawPrint} title="Nenhum animal cadastrado" subtitle="Cadastre o primeiro animal usando o código SIP." action={<Btn onClick={() => setForm({})}><Plus size={14} /> Novo animal</Btn>} />
@@ -580,6 +598,8 @@ function ModuloAnimais({ animais, reload, showToast, goTo }) {
 }
 
 function AnimalForm({ inicial, animaisExistentes, onSalvar, onCancelar, salvando }) {
+  const isEdicao = !!inicial?.sip; // Verifica se é uma edição de registro existente
+  
   const [f, setF] = useState({
     sip: "", linhagem: LINHAGENS[0], sexo: "Fêmea", data_nascimento: "", origem: "", categoria: "", 
     ceua_protocolo: "", ceua_professor: "", ceua_pesquisador: "", avos_maternos: "", avos_paternos: "",
@@ -592,7 +612,7 @@ function AnimalForm({ inicial, animaisExistentes, onSalvar, onCancelar, salvando
   function submit(e) {
     e.preventDefault();
     if (!f.sip.trim()) return setErro("Código SIP é obrigatório.");
-    if (!inicial?.sip && animaisExistentes.some((a) => a.sip === f.sip.trim())) {
+    if (!isEdicao && animaisExistentes.some((a) => a.sip === f.sip.trim())) {
       return setErro("Já existe um animal com esse código SIP.");
     }
     setErro("");
@@ -600,10 +620,13 @@ function AnimalForm({ inicial, animaisExistentes, onSalvar, onCancelar, salvando
   }
 
   return (
-    <form onSubmit={submit} className="bg-white border border-[#E4E0D4] rounded-lg p-5 mb-5">
+    <form onSubmit={submit} className="bg-white border border-[#E4E0D4] rounded-lg p-5 mb-5 shadow-sm">
+      <div className="text-sm font-semibold text-[#1B3A54] mb-3 uppercase tracking-wide border-b border-gray-100 pb-2">
+        {isEdicao ? `Editando Informações: ${f.sip}` : "Novo Registro de Animal"}
+      </div>
       <div className="grid grid-cols-2 gap-x-4">
         <Field label="Código SIP" required>
-          <TextInput value={f.sip} onChange={(e) => upd("sip", e.target.value)} placeholder="BC_B6_ATEND_015.26" />
+          <TextInput value={f.sip} onChange={(e) => upd("sip", e.target.value)} disabled={isEdicao} placeholder="BC_B6_ATEND_015.26" />
         </Field>
         <Field label="Linhagem" required>
           <Select value={f.linhagem} onChange={(e) => upd("linhagem", e.target.value)}>
@@ -619,7 +642,6 @@ function AnimalForm({ inicial, animaisExistentes, onSalvar, onCancelar, salvando
           <TextInput type="date" value={f.data_nascimento || ""} onChange={(e) => upd("data_nascimento", e.target.value)} />
         </Field>
         
-        {/* Alteração 1: Adição das categorias e origens estruturadas */}
         <Field label="Categoria">
           <Select value={f.categoria} onChange={(e) => upd("categoria", e.target.value)}>
             <option value="">Selecione...</option>
@@ -647,40 +669,38 @@ function AnimalForm({ inicial, animaisExistentes, onSalvar, onCancelar, salvando
         </Field>
       </div>
 
-      {/* Condicional de Exibição dos dados do CEUA se for de experimentação */}
       {f.categoria === "Experimentação" && (
         <div className="bg-blue-50/60 p-4 rounded-md mb-4 grid grid-cols-1 md:grid-cols-3 gap-4 border border-blue-200">
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wide text-blue-900 mb-1">Nº do Protocolo CEUA</label>
-            <input type="text" value={f.ceua_protocolo} onChange={(e) => upd("ceua_protocolo", e.target.value)} className={inputCls} />
+            <input type="text" value={f.ceua_protocolo || ""} onChange={(e) => upd("ceua_protocolo", e.target.value)} className={inputCls} />
           </div>
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wide text-blue-900 mb-1">Professor</label>
-            <input type="text" value={f.ceua_professor} onChange={(e) => upd("ceua_professor", e.target.value)} className={inputCls} />
+            <input type="text" value={f.ceua_professor || ""} onChange={(e) => upd("ceua_professor", e.target.value)} className={inputCls} />
           </div>
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wide text-blue-900 mb-1">Pesquisador Responsável</label>
-            <input type="text" value={f.ceua_pesquisador} onChange={(e) => upd("ceua_pesquisador", e.target.value)} className={inputCls} />
+            <input type="text" value={f.ceua_pesquisador || ""} onChange={(e) => upd("ceua_pesquisador", e.target.value)} className={inputCls} />
           </div>
         </div>
       )}
 
-      {/* Rastreabilidade Genética: Avós */}
       <div className="grid grid-cols-2 gap-x-4 border-t border-gray-100 pt-3 mt-1">
         <Field label="Avós Maternos">
-          <TextInput placeholder="Avó e Avô Maternos" value={f.avos_maternos} onChange={(e) => upd("avos_maternos", e.target.value)} />
+          <TextInput placeholder="Avó e Avô Maternos" value={f.avos_maternos || ""} onChange={(e) => upd("avos_maternos", e.target.value)} />
         </Field>
         <Field label="Avós Paternos">
-          <TextInput placeholder="Avó e Avô Paternos" value={f.avos_paternos} onChange={(e) => upd("avos_paternos", e.target.value)} />
+          <TextInput placeholder="Avó e Avô Paternos" value={f.avos_paternos || ""} onChange={(e) => upd("avos_paternos", e.target.value)} />
         </Field>
       </div>
 
       <Field label="Observações">
-        <TextArea value={f.observacoes} onChange={(e) => upd("observacoes", e.target.value)} />
+        <TextArea value={f.observacoes || ""} onChange={(e) => upd("observacoes", e.target.value)} />
       </Field>
       {erro && <p className="text-sm text-[#A6493C] mb-3">{erro}</p>}
       <div className="flex gap-2">
-        <Btn type="submit" disabled={salvando}>{salvando ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Salvar</Btn>
+        <Btn type="submit" disabled={salvando}>{salvando ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Salvar Alterações</Btn>
         <Btn type="button" variant="ghost" onClick={onCancelar}>Cancelar</Btn>
       </div>
     </form>
@@ -951,7 +971,6 @@ function AtendimentoForm({ inicial, animais, onSalvar, onCancelar }) {
         <Field label="Conduta"><TextArea value={f.conduta} onChange={(e) => upd("conduta", e.target.value)} /></Field>
         <Field label="Tratamento Geral"><TextArea value={f.tratamento} onChange={(e) => upd("tratamento", e.target.value)} /></Field>
         
-        {/* Alteração 2: Inclusão do Módulo VetSmart de medicação */}
         <div className="border-t border-gray-200 pt-4 mt-2">
           <span className="block text-xs font-semibold uppercase tracking-wide text-[#4A7C7C] mb-3">Farmacologia Médica (VetSmart)</span>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1207,7 +1226,6 @@ function ReproducaoForm({ inicial, animais, onSalvar, onCancelar }) {
             </Select>
           </Field>
           
-          {/* Alteração 3: Inclusão estruturada e explícita do Reprodutor Macho */}
           <Field label="Reprodutor (SIP - Macho)">
             <Select value={f.reprodutor_id} onChange={(e) => upd("reprodutor_id", e.target.value)}>
               <option value="">Selecione…</option>
@@ -1271,7 +1289,6 @@ function ReproducaoForm({ inicial, animais, onSalvar, onCancelar }) {
         <Field label="Tratamentos realizados"><TextArea value={f.tratamentos} onChange={(e) => upd("tratamentos", e.target.value)} /></Field>
       </SecaoForm>
 
-      {/* Alteração 3 (Espelhada): Avaliação Periódica valendo com mesmo peso para Macho e Fêmea */}
       <SecaoForm titulo="Avaliação Periódica do Casal Reprodutor">
         <div className="space-y-3 mb-3">
           {f.monitoramento.map((m, i) => (
@@ -1355,7 +1372,7 @@ function ModuloNecropsias({ necropsias, animais, reload, showToast }) {
 
   async function excluir(id) {
     await deleteRecord("necropsias", "id", id);
-    showToast("Necropsia excluído");
+    showToast("Necropsia excluída");
     reload();
   }
 
@@ -1534,10 +1551,10 @@ function NecropsiaForm({ inicial, animais, onSalvar, onCancelar }) {
 }
 
 // ---------------------------------------------------------------------------
-// Detalhe do animal
+// Detalhe do animal (Com Botão de Edição Liberado)
 // ---------------------------------------------------------------------------
 
-function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, necropsias, voltar }) {
+function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, necropsias, voltar, onEditarAnimal }) {
   const animal = animais.find((a) => a.sip === sip);
   if (!animal) return <p className="text-sm text-[#8A8574]">Animal não encontrado.</p>;
 
@@ -1548,14 +1565,21 @@ function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, necropsias, vo
 
   return (
     <div>
-      <Btn variant="ghost" onClick={voltar} className="mb-4 !px-2"><ArrowLeft size={14} /> Voltar</Btn>
+      <div className="flex items-center justify-between mb-4">
+        <Btn variant="ghost" onClick={voltar} className="!px-2"><ArrowLeft size={14} /> Voltar</Btn>
+        
+        {/* Nova Funcionalidade: Botão disparador de edição das fichas de animais */}
+        <Btn onClick={() => onEditarAnimal(animal)} className="!bg-[#4A7C7C] hover:!bg-[#3A6363]">
+          <Edit3 size={14} /> Editar Dados do Animal
+        </Btn>
+      </div>
+      
       <div className="flex items-center gap-3 mb-1">
         <SipBadge sip={animal.sip} linhagem={animal.linhagem} />
         <span className="text-sm text-[#5C5C52]">{animal.linhagem} · {animal.sexo}</span>
         {animal.categoria && <span className="text-xs bg-gray-200/80 px-2 py-0.5 rounded text-gray-700 font-medium">{animal.categoria}</span>}
       </div>
       
-      {/* Alteração 4: Idade em meses exposta em tempo real */}
       <div className="text-xs text-[#B5AF9E] mb-4 space-y-0.5">
         <div><strong>Data de Nascimento:</strong> {fmtDate(animal.data_nascimento)}</div>
         <div><strong>Idade do Espécime:</strong> {calcIdadeApenasMeses(animal.data_nascimento)}</div>
@@ -1572,7 +1596,6 @@ function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, necropsias, vo
         </div>
       )}
 
-      {/* Exibição da Genealogia estendida com os avós */}
       {(animal.avos_maternos || animal.avos_paternos) && (
         <div className="bg-gray-50 text-gray-700 p-3 rounded-lg border border-gray-200 text-xs mb-4 space-y-1">
           <div className="font-bold uppercase text-gray-600 mb-0.5">Rastreabilidade Genética Estendida</div>
