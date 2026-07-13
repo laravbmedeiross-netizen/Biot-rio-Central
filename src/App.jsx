@@ -424,7 +424,7 @@ function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparF
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-sm font-bold uppercase tracking-wider text-gray-500">Espécies</h2>
-        <Btn onClick={() => { setForm({ status: "Ativo", especie: "Rato", linhagem: "Wistar", categoria: "Matriz", origem: "Biotério Central" }); limparForcarEdicao(); }}><Plus size={13} /> Cadastrar Animal</Btn>
+        <Btn onClick={() => { setForm({ status: "Ativo", especie: "Rato", linhagem: "Wistar", sexo: "Fêmea", categoria: "Matriz", origem: "Biotério Central" }); limparForcarEdicao(); }}><Plus size={13} /> Cadastrar Animal</Btn>
       </div>
 
       {form && (
