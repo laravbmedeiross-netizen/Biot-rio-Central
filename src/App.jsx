@@ -36,7 +36,6 @@ const MODULOS = [
   { id: "necropsias", label: "Necropsias", icon: Skull },
 ];
 
-// Mapeamento dos Checkboxes de Exame Externo (Comum a Atendimento e Necropsia)
 const CHECKBOXES_PELE_PELAGEM = [
   { k: "ext_normal", label: "Normal" }, { k: "ext_alopecia", label: "Alopecia" },
   { k: "ext_dermatite", label: "Dermatite" }, { k: "ext_erica", label: "Eriçada" },
@@ -59,6 +58,15 @@ const CHECKBOXES_ESTADO_GERAL = [
   { k: "ger_comportamental", label: "Alteração comportamental" }, { k: "ger_cifose", label: "Cifose" },
   { k: "ger_sinais_dor", label: "Sinais de dor" }, { k: "ger_resp_abdominal", label: "Respiração abdominal" },
   { k: "ger_dispneia", label: "Dispneia" }, { k: "ger_taquipneia", label: "Taquipneia" }
+];
+
+const ACHADOS_SISTEMA_NECROPSIA = [
+  { k: "ach_respiratorio", label: "Sistema respiratório" },
+  { k: "ach_digestorio", label: "Sistema digestório" },
+  { k: "ach_urogenital", label: "Sistema urogenital" },
+  { k: "ach_cardiovascular", label: "Sistema cardiovascular" },
+  { k: "ach_nervoso", label: "Sistema nervoso" },
+  { k: "ach_outros", label: "Outros achados" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -112,7 +120,6 @@ function totaisNinhadas(ninhadas = []) {
   }), { nascidos: 0, desmamados: 0 });
 }
 
-// Renderizador de campos com tratamento anti-quebra
 function DetalheCampo({ label, valor, badge }) {
   if (!valor || String(valor).trim() === "" || String(valor) === "undefined" || valor === false) return null;
   return (
@@ -131,6 +138,33 @@ function SipBadge({ sip, linhagem }) {
     <span className="inline-flex items-center px-2 py-0.5 rounded font-mono text-xs font-bold border" style={{ borderColor: cor, color: cor, backgroundColor: `${cor}0F` }}>
       {sip || "SEM ID"}
     </span>
+  );
+}
+
+function CardAnimalCompacto({ animal, onClick }) {
+  return (
+    <button 
+      onClick={onClick} 
+      className="w-full flex items-center justify-between bg-white border border-gray-200 rounded-lg px-4 py-3 hover:border-[#4A7C7C] transition-colors text-left shadow-sm"
+    >
+      <div className="flex items-center gap-3">
+        <SipBadge sip={animal.sip} linhagem={animal.linhagem} />
+        <span className="text-sm font-medium text-gray-600">
+          {animal.sexo} · {animal.linhagem} · {calcIdadeApenasMeses(animal.data_nascimento)}
+        </span>
+        {animal.categoria && (
+          <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium">
+            {animal.categoria}
+          </span>
+        )}
+      </div>
+      <div className="flex items-center gap-3">
+        <span className={`text-xs px-2 py-0.5 rounded-full ${animal.status === "Ativo" ? "bg-emerald-50 text-emerald-700 font-medium" : "bg-red-50 text-red-700 font-medium"}`}>
+          {animal.status || "Ativo"}
+        </span>
+        <ChevronRight size={16} className="text-gray-400" />
+      </div>
+    </button>
   );
 }
 
@@ -188,7 +222,7 @@ function GradeCheckboxes({ titulo, lista, objetoForm, setObjetoForm }) {
 }
 
 // ---------------------------------------------------------------------------
-// Componente Mestre da Aplicação
+// Componente Principal (App)
 // ---------------------------------------------------------------------------
 
 export default function App() {
@@ -229,7 +263,7 @@ export default function App() {
   }, [loadAll, session]);
 
   if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
-    return <div className="p-10 text-center font-mono text-red-600">Variáveis do Supabase ausentes no Vercel (.env).</div>;
+    return <div className="p-10 text-center font-mono text-red-600">Variáveis do Supabase ausentes (.env).</div>;
   }
 
   if (session === undefined) return null;
@@ -247,7 +281,7 @@ export default function App() {
       setModulo("animais");
       loadAll();
     } catch {
-      showToast("Não foi possível excluir. Remova todos os laudos vinculados a este SIP primeiro.");
+      showToast("Não foi possível excluir. Remova fichas vinculadas a este SIP primeiro.");
     }
   }
 
@@ -256,7 +290,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex bg-[#F7F5F0] text-gray-800 font-sans antialiased">
-      {/* Sidebar Corporativa */}
       <aside className="w-56 shrink-0 bg-[#1B3A54] text-[#E9E5D8] flex flex-col shadow-xl">
         <div className="px-5 py-5 border-b border-white/10 bg-[#15293D]">
           <p className="text-[9px] uppercase tracking-[0.2em] text-[#8FB3B3] font-bold">Centro de Biociências · UFRN</p>
@@ -278,11 +311,10 @@ export default function App() {
         </div>
       </aside>
 
-      {/* Painel Central */}
       <main className="flex-1 min-w-0 flex flex-col">
         <div className="border-b border-gray-200 bg-white px-8 py-3.5 flex items-center gap-3 shadow-sm">
           <Search size={15} className="text-gray-400" />
-          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Pesquisa rápida por código SIP ou linhagem de roedores..." className="flex-1 bg-transparent outline-none text-xs text-gray-700" />
+          <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Pesquisa rápida por código SIP..." className="flex-1 bg-transparent outline-none text-xs text-gray-700" />
           {loading && <Loader2 size={14} className="animate-spin text-[#4A7C7C]" />}
         </div>
 
@@ -398,9 +430,9 @@ function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparF
             <Field label="Sexo Anatômico"><Select value={form.sexo || "Fêmea"} onChange={e => setForm({...form, sexo: e.target.value})}><option>Fêmea</option><option>Macho</option></Select></Field>
             <Field label="Categoria Biotécnica"><Select value={form.categoria || "Matriz"} onChange={e => setForm({...form, categoria: e.target.value})}><option>Matriz</option><option>Reprodutor</option><option>Manutenção</option><option>Experimentação</option></Select></Field>
             <Field label="Data Nascimento"><TextInput type="date" value={form.data_nascimento || ""} onChange={e => setForm({...form, data_nascimento: e.target.value})} /></Field>
-            <Field label="Status Cadastral"><Select value={form.status || "Ativo"} onChange={e => setForm({...form, status: e.target.value})}>><option>Ativo</option><option>Óbito</option><option>Eutanásia</option></Select></Field>
+            <Field label="Status Cadastral"><Select value={form.status || "Ativo"} onChange={e => setForm({...form, status: e.target.value})}><option>Ativo</option><option>Óbito</option><option>Eutanásia</option></Select></Field>
           </div>
-          <Field label="Anotações Complementares / Observações Genéticas"><TextArea value={form.observacoes || ""} onChange={e => setForm({...form, observacoes: e.target.value})} /></Field>
+          <Field label="Anotações Complementares"><TextArea value={form.observacoes || ""} onChange={e => setForm({...form, observacoes: e.target.value})} /></Field>
           <div className="flex gap-2"><Btn type="submit">Salvar Cadastro</Btn><Btn type="button" variant="ghost" onClick={() => { setForm(null); limparForcarEdicao(); }}>Cancelar</Btn></div>
         </form>
       )}
@@ -429,7 +461,7 @@ function ModuloAtendimentos({ atendimentos, animais, reload, showToast }) {
         <Btn onClick={() => setForm({
           tratamentos: [], procedimentos: [], reavaliacoes: [],
           escore_corporal: "BC3", cromo: "0"
-        })}><Plus size={13} /> Nova Ficha Clínicas</Btn>
+        })}><Plus size={13} /> Nova Ficha Clínica</Btn>
       </div>
 
       {form && (
@@ -480,26 +512,26 @@ function ModuloAtendimentos({ atendimentos, animais, reload, showToast }) {
 
                 <DetalheCampo label="Hipótese Diagnóstica" valor={at.diagnostico} />
                 <DetalheCampo label="Conduta Adotada" valor={at.conduta_adotada} />
-                <DetalheCampo label="Anotações / Descrição Complementar" valor={at.descricao_atendimento} />
+                <DetalheCampo label="Anotações / Descrição" valor={at.descricao_atendimento} />
                 <DetalheCampo label="Desfecho / Data Fechamento" valor={at.desfecho ? `${at.desfecho} (Em ${fmtDate(at.data_desfecho)})` : null} />
 
-                {/* Subtabelas Clínicas */}
-                {at.tratamentos?.length > 0 && (
+                {/* Subtabelas Clínicas Blindadas Contra Travamento */}
+                {Array.isArray(at.tratamentos) && at.tratamentos.length > 0 && (
                   <div className="border rounded-md overflow-hidden text-xs bg-white">
                     <div className="bg-gray-100 p-2 font-bold text-gray-600 border-b">Tratamento Instituído</div>
                     <table className="w-full text-left">
                       <thead><tr className="bg-gray-50/50 border-b text-gray-400 font-bold text-[10px]"><th className="p-1.5">Data</th><th className="p-1.5">Medicamento</th><th className="p-1.5">Dose</th><th className="p-1.5">Via/Freq</th></tr></thead>
-                      <tbody>{at.tratamentos.map((t, idx) => <tr key={idx} className="border-b"><td className="p-1.5">{fmtDate(t.data)}</td><td className="p-1.5">{t.med}</td><td className="p-1.5">{t.dose}</td><td className="p-1.5">{t.via} - {t.freq}</td></tr>)}</tbody>
+                      <tbody>{at.tratamentos.map((t, idx) => <tr key={idx} className="border-b"><td className="p-1.5">{fmtDate(t.data)}</td><td className="p-1.5">{t.med}</td><td className="p-1.5">{t.dose}</td><td className="p-1.5">{t.via}</td></tr>)}</tbody>
                     </table>
                   </div>
                 )}
 
-                {at.reavaliacoes?.length > 0 && (
+                {Array.isArray(at.reavaliacoes) && at.reavaliacoes.length > 0 && (
                   <div className="border rounded-md overflow-hidden text-xs bg-white">
                     <div className="bg-gray-100 p-2 font-bold text-gray-600 border-b">Acompanhamento e Reavaliações</div>
                     <table className="w-full text-left">
-                      <thead><tr className="bg-gray-50/50 border-b text-gray-400 font-bold text-[10px]"><th className="p-1.5">Data</th><th className="p-1.5">Evolução Clínica</th><th className="p-1.5">Conduta</th><th className="p-1.5">Vet</th></tr></thead>
-                      <tbody>{at.reavaliacoes.map((rv, idx) => <tr key={idx} className="border-b"><td className="p-1.5">{fmtDate(rv.data)}</td><td className="p-1.5">{rv.ev}</td><td className="p-1.5">{rv.cond}</td><td className="p-1.5">{rv.resp}</td></tr>)}</tbody>
+                      <thead><tr className="bg-gray-50/50 border-b text-gray-400 font-bold text-[10px]"><th className="p-1.5">Data</th><th className="p-1.5">Evolução Clínica</th><th className="p-1.5">Responsável</th></tr></thead>
+                      <tbody>{at.reavaliacoes.map((rv, idx) => <tr key={idx} className="border-b"><td className="p-1.5">{fmtDate(rv.data)}</td><td className="p-1.5">{rv.ev}</td><td className="p-1.5">{rv.resp}</td></tr>)}</tbody>
                     </table>
                   </div>
                 )}
@@ -524,28 +556,27 @@ function AtendimentoFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
     tratamentos: [], procedimentos: [], reavaliacoes: [], desfecho: "", data_desfecho: "", ...inicial
   });
 
-  // Funções de manipulação das tabelas dinâmicas do impresso
   const [linhaTrat, setLinhaTrat] = useState({ data: "", med: "", dose: "", via: "", freq: "", duracao: "", resp: "" });
   const [linhaReav, setLinhaReav] = useState({ data: "", ev: "", param: "", cond: "manter", resp: "" });
 
   return (
     <div className="bg-white border rounded-lg p-5 space-y-4 text-left shadow-md">
       <div className="flex justify-between items-center border-b pb-2">
-        <h3 className="font-bold text-[#1B3A54]">Ficha de Intervenção Clínica / Atendimento Oficial</h3>
+        <h3 className="font-bold text-[#1B3A54]">Ficha de Atendimento Oficial</h3>
         <span className="text-xs text-gray-400">CB - UFRN</span>
       </div>
 
-      <SecaoForm titulo="1. Identificação Clinica">
+      <SecaoForm titulo="1. Identificação Clínica">
         <Field label="Código Matriz / SIP" required><Select value={f.sip} onChange={e => setF({...f, sip: e.target.value})}><option value="">Selecione…</option>{animais.map(a => <option key={a.sip} value={a.sip}>{a.sip}</option>)}</Select></Field>
         <Field label="Data Intervenção"><TextInput type="date" value={f.data} onChange={e => setF({...f, data: e.target.value})} /></Field>
-        <Field label="Veterinário / Auxiliar Responsável"><TextInput value={f.responsavel} onChange={e => setF({...f, responsavel: e.target.value})} /></Field>
+        <Field label="Responsável Técnico"><TextInput value={f.responsavel} onChange={e => setF({...f, responsavel: e.target.value})} /></Field>
       </SecaoForm>
 
       <SecaoForm titulo="2. Triagem e Escalas Físicas">
         <Field label="Motivo do Atendimento"><Select value={f.motivo_chamado} onChange={e => setF({...f, motivo_chamado: e.target.value})}><option>Avaliação clínica</option><option>Sinais de dor</option><option>Lesão / trauma</option><option>Sinais respiratórios</option><option>Emagrecimento</option><option>Sinais digestivos</option><option>Intercorrência reprodutiva</option></Select></Field>
         <Field label="Condição Corporal (BCS)"><Select value={f.escore_corporal} onChange={e => setF({...f, escore_corporal: e.target.value})}>{BCS_OPCOES.map(o => <option key={o.v} value={o.v}>{o.label}</option>)}</Select></Field>
         <Field label="Cromodacriorreia"><Select value={f.cromo} onChange={e => setF({...f, cromo: e.target.value})}>{CROMO_OPCOES.map(o => <option key={o.v} value={o.v}>{o.label}</option>)}</Select></Field>
-        <Field label="Peso Corpóreo Gravado (g)"><TextInput type="number" value={f.peso} onChange={e => setF({...f, peso: e.target.value})} /></Field>
+        <Field label="Peso Corpóreo (g)"><TextInput type="number" value={f.peso} onChange={e => setF({...f, peso: e.target.value})} /></Field>
       </SecaoForm>
 
       <div className="space-y-3">
@@ -555,11 +586,10 @@ function AtendimentoFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
       </div>
 
       <div className="bg-gray-50 border rounded-lg p-3 space-y-3">
-        <span className="block text-[11px] font-bold uppercase tracking-wider text-[#4A7C7C]">3. Tabelas de Tratamento e Acompanhamento Clínico</span>
+        <span className="block text-[11px] font-bold uppercase tracking-wider text-[#4A7C7C]">3. Tabelas Dinâmicas de Tratamento e Acompanhamento</span>
         
-        {/* Adicionar Linhas de Tratamento */}
         <div className="bg-white p-3 border rounded space-y-2">
-          <span className="block text-[10px] font-bold uppercase text-gray-400">Inserir Medicamento / Conduta Farmacológica</span>
+          <span className="block text-[10px] font-bold uppercase text-gray-400">Adicionar Conduta Farmacológica</span>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             <TextInput type="date" value={linhaTrat.data} onChange={e => setLinhaTrat({...linhaTrat, data: e.target.value})} />
             <TextInput placeholder="Medicamento" value={linhaTrat.med} onChange={e => setLinhaTrat({...linhaTrat, med: e.target.value})} />
@@ -568,31 +598,32 @@ function AtendimentoFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
           </div>
           <Btn type="button" variant="ghost" onClick={() => {
             if(!linhaTrat.med) return;
-            setF({...f, tratamentos: [...(f.tratamentos || []), linhaTrat]});
+            const listaTrat = Array.isArray(f.tratamentos) ? f.tratamentos : [];
+            setF({...f, tratamentos: [...listaTrat, linhaTrat]});
             setLinhaTrat({ data: "", med: "", dose: "", via: "", freq: "", duracao: "", resp: "" });
-          }}>+ Registrar na Ficha</Btn>
+          }}>+ Incluir na Ficha</Btn>
         </div>
 
-        {/* Adicionar Linhas de Reavaliação */}
         <div className="bg-white p-3 border rounded space-y-2">
-          <span className="block text-[10px] font-bold uppercase text-gray-400">Adicionar Histórico de Reavaliações</span>
+          <span className="block text-[10px] font-bold uppercase text-gray-400">Registrar Linha de Reavaliação</span>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             <TextInput type="date" value={linhaReav.data} onChange={e => setLinhaReav({...linhaReav, data: e.target.value})} />
             <TextInput placeholder="Evolução Clínica Constatada" value={linhaReav.ev} onChange={e => setLinhaReav({...linhaReav, ev: e.target.value})} />
-            <TextInput placeholder="Responsável Técnico" value={linhaReav.resp} onChange={e => setLinhaReav({...linhaReav, resp: e.target.value})} />
+            <TextInput placeholder="Responsável" value={linhaReav.resp} onChange={e => setLinhaReav({...linhaReav, resp: e.target.value})} />
           </div>
           <Btn type="button" variant="ghost" onClick={() => {
             if(!linhaReav.ev) return;
-            setF({...f, reavaliacoes: [...(f.reavaliacoes || []), linhaReav]});
+            const listaReav = Array.isArray(f.reavaliacoes) ? f.reavaliacoes : [];
+            setF({...f, reavaliacoes: [...listaReav, linhaReav]});
             setLinhaReav({ data: "", ev: "", param: "", cond: "manter", resp: "" });
-          }}>+ Gravar Reavaliação</Btn>
+          }}>+ Incluir Reavaliação</Btn>
         </div>
       </div>
 
       <SecaoForm titulo="4. Diagnósticos e Fechamento">
         <Field label="Hipótese Diagnóstica Geral"><TextArea value={f.diagnostico} onChange={e => setF({...f, diagnostico: e.target.value})} /></Field>
-        <Field label="Conduta Veterinária Inicial"><TextArea value={f.conduta_adotada} onChange={e => setF({...f, conduta_adotada: e.target.value})} /></Field>
-        <Field label="Anotações de Evolução Complementar"><TextArea value={f.descricao_atendimento} onChange={e => setF({...f, descricao_atendimento: e.target.value})} /></Field>
+        <Field label="Conduta Veterinária Adotada"><TextArea value={f.conduta_adotada} onChange={e => setF({...f, conduta_adotada: e.target.value})} /></Field>
+        <Field label="Anotações Complementares"><TextArea value={f.descricao_atendimento} onChange={e => setF({...f, descricao_atendimento: e.target.value})} /></Field>
       </SecaoForm>
 
       <SecaoForm titulo="5. Desfecho do Atendimento (Arquivamento)">
@@ -606,7 +637,7 @@ function AtendimentoFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
 }
 
 // ---------------------------------------------------------------------------
-// Módulo Reprodução (Prontuário Médico das Matrizes)
+// Módulo Reprodução (Prontuário das Matrizes)
 // ---------------------------------------------------------------------------
 function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
   const [form, setForm] = useState(null);
@@ -646,9 +677,9 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
                 <div>
                   <div className="flex items-center gap-2">
                     <SipBadge sip={r.sip} linhagem={animal?.linhagem} />
-                    <span className="text-xs text-gray-500 font-medium">× Reprodutor Macho: <strong>{r.reprodutor_id || "Não Identificado"}</strong></span>
+                    <span className="text-xs text-gray-500 font-medium">× Macho: <strong>{r.reprodutor_id || "Não Identificado"}</strong></span>
                   </div>
-                  <p className="text-xs text-gray-400 mt-1">{r.ninhadas?.length || 0} partos catalogados · {tot.nascidos} filhotes nascidos · {tot.desmamados} desmames homologados</p>
+                  <p className="text-xs text-gray-400 mt-1">{Array.isArray(r.ninhadas) ? r.ninhadas.length : 0} partos catalogados · {tot.nascidos} filhotes · {tot.desmamados} desmames</p>
                 </div>
                 <ChevronRight size={16} className={`transition-transform text-gray-400 ${aberto === r.id ? "rotate-90" : ""}`} />
               </button>
@@ -657,16 +688,17 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
                 <div className="mt-4 pt-4 border-t space-y-4 text-left text-xs">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50/50 p-3 rounded">
                     <div>
-                      <span className="block font-bold text-[#4A7C7C] border-b mb-1">Genealogia Familiar Matriz ({r.sip})</span>
+                      <span className="block font-bold text-[#4A7C7C] border-b mb-1">Genealogia Fêmea Matriz ({r.sip})</span>
                       <p>Progenitores: {r.matriz_pais || "—"} | Avós Maternos: {r.matriz_avos_m || "—"}</p>
                     </div>
                     <div>
-                      <span className="block font-bold text-[#4A7C7C] border-b mb-1">Genealogia Familiar Reprodutor ({r.reprodutor_id})</span>
+                      <span className="block font-bold text-[#4A7C7C] border-b mb-1">Genealogia Macho Reprodutor ({r.reprodutor_id})</span>
                       <p>Progenitores: {r.rep_pais || "—"} | Avós Paternos: {r.rep_avos_p || "—"}</p>
                     </div>
                   </div>
 
-                  {r.ninhadas?.length > 0 && (
+                  {/* Tabela Reprodutiva Protegida */}
+                  {Array.isArray(r.ninhadas) && r.ninhadas.length > 0 && (
                     <div className="border rounded overflow-hidden">
                       <div className="bg-gray-100 p-2 font-bold text-gray-600">Histórico Cronológico de Linhadas</div>
                       <table className="w-full text-left bg-white">
@@ -711,7 +743,7 @@ function ReproducaoFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
 
   return (
     <div className="bg-white border rounded-lg p-5 space-y-4 text-left shadow-md">
-      <h3 className="font-bold text-[#1B3A54] border-b pb-2">Prontuário de Acompanhamento Reprodutivo Corporativo</h3>
+      <h3 className="font-bold text-[#1B3A54] border-b pb-2">Prontuário de Acompanhamento Reprodutivo</h3>
 
       <SecaoForm titulo="1. Acasalamento Base">
         <Field label="Código Fêmea Matriz (SIP)" required><Select value={f.sip} onChange={e => setF({...f, sip: e.target.value})}><option value="">Selecione…</option>{animais.filter(a => a.sexo === "Fêmea").map(a => <option key={a.sip} value={a.sip}>{a.sip}</option>)}</Select></Field>
@@ -744,9 +776,9 @@ function ReproducaoFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
           </div>
           <Btn type="button" variant="ghost" onClick={() => {
             if(!linhaNinhada.data) return;
-            // Cálculo automático simplificado de desmamados baseado no preenchimento
+            const listaNinhadas = Array.isArray(f.ninhadas) ? f.ninhadas : [];
             const desm = Number(linhaNinhada.n_machos || 0) + Number(linhaNinhada.n_femeas || 0);
-            setF({...f, ninhadas: [...(f.ninhadas || []), { ...linhaNinhada, n_desmamados: desm }]});
+            setF({...f, ninhadas: [...listaNinhadas, { ...linhaNinhada, n_desmamados: desm }]});
             setLinhaNinhada({ data: "", n_nascidos: "", n_machos: "", n_femeas: "", data_desmame: "", obs: "" });
           }}>+ Registrar Parto na Linha</Btn>
         </div>
@@ -754,12 +786,12 @@ function ReproducaoFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
 
       <SecaoForm titulo="3. Término Reprodutivo (Inativação da Colônia)">
         <Field label="Data Descarte Matriz"><TextInput type="date" value={f.term_data_matriz} onChange={e => setF({...f, term_data_matriz: e.target.value})} /></Field>
-        <Field label="Motivo Matriz"><TextInput value={f.term_motivo_matriz} onChange={e => setF({...f, term_motivo_matriz: e.target.value})} placeholder="Ex: Idade avançada" /></Field>
+        <Field label="Motivo Matriz"><TextInput value={f.term_motivo_matriz} onChange={e => setF({...f, term_motivo_matriz: e.target.value})} /></Field>
         <Field label="Data Descarte Reprodutor"><TextInput type="date" value={f.term_data_reprodutor} onChange={e => setF({...f, term_data_reprodutor: e.target.value})} /></Field>
         <Field label="Motivo Reprodutor"><TextInput value={f.term_motivo_reprodutor} onChange={e => setF({...f, term_motivo_reprodutor: e.target.value})} /></Field>
       </SecaoForm>
 
-      <div className="flex gap-2 pt-2 border-t"><Btn type="button" onClick={() => onSalvar({ ...f, id: f.id || genId("rep") })}>Salvar Prontuário Reprodutivo</Btn><Btn type="button" variant="ghost" onClick={onCancelar}>Voltar</Btn></div>
+      <div className="flex gap-2 pt-2 border-t"><Btn type="button" onClick={() => onSalvar({ ...f, id: f.id || genId("rep") })}>Salvar Prontuário</Btn><Btn type="button" variant="ghost" onClick={onCancelar}>Voltar</Btn></div>
     </div>
   );
 }
@@ -839,15 +871,15 @@ function NecropsiaFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
 
   return (
     <div className="bg-white border rounded-lg p-5 space-y-4 text-left shadow-md">
-      <h3 className="font-bold text-[#1B3A54] border-b pb-2">Ficha de Necropsia Estruturada de Roedores</h3>
+      <h3 className="font-bold text-[#1B3A54] border-b pb-2">Ficha de Necropsia Estruturada</h3>
 
       <SecaoForm titulo="1. Metadados do Procedimento">
         <Field label="Código SIP do Animal" required><Select value={f.sip} onChange={e => setF({...f, sip: e.target.value})}><option value="">Selecione…</option>{animais.map(a => <option key={a.sip} value={a.sip}>{a.sip}</option>)}</Select></Field>
         <Field label="Data da Necropsia"><TextInput type="date" value={f.data} onChange={e => setF({...f, data: e.target.value})} /></Field>
         <Field label="Patologista Responsável"><TextInput value={f.responsavel} onChange={e => setF({...f, responsavel: e.target.value})} /></Field>
-        <Field label="Método Eutanasia"><Select value={f.metodo_eutanasia} onChange={e => setF({...f, metodo_eutanasia: e.target.value})}><option>Cetamina e Xilazina</option><option>CO2</option><option>Outro</option></Select></Field>
+        <Field label="Método Eutanásia"><Select value={f.metodo_eutanasia} onChange={e => setF({...f, metodo_eutanasia: e.target.value})}><option>Cetamina e Xilazina</option><option>CO2</option><option>Outro</option></Select></Field>
         <Field label="Condição da Carcaça"><Select value={f.condicao_carcaca} onChange={e => setF({...f, condicao_carcaca: e.target.value})}><option>Íntegra</option><option>Autólise leve</option><option>Autólise moderada</option><option>Autólise avançada</option></Select></Field>
-        <Field label="Motivo da Necropsia"><TextInput value={f.motivo_necropsia} onChange={e => setF({...f, motivo_necropsia: e.target.value})} placeholder="Ex: Morte espontânea" /></Field>
+        <Field label="Motivo da Necropsia"><TextInput value={f.motivo_necropsia} onChange={e => setF({...f, motivo_necropsia: e.target.value})} /></Field>
       </SecaoForm>
 
       <SecaoForm titulo="2. Inspeção Cadavérica Externa">
@@ -859,27 +891,27 @@ function NecropsiaFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
         <span className="block text-[11px] font-bold uppercase tracking-wider text-[#4A7C7C] border-b mb-2">3. Exame Interno dos Sistemas Orgânicos</span>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {ACHADOS_SISTEMA_NECROPSIA.map(s => (
-            <Field key={s.k} label={s.label}><TextArea value={f[s.k] || ""} onChange={e => setF({...f, [s.k]: e.target.value})} placeholder="Descreva o estado dos órgãos ou relate 'sem alterações'..." /></Field>
+            <Field key={s.k} label={s.label}><TextArea value={f[s.k] || ""} onChange={e => setF({...f, [s.k]: e.target.value})} placeholder="Descreva as alterações encontradas..." /></Field>
           ))}
         </div>
       </div>
 
       <SecaoForm titulo="4. Conclusões de Laudo">
         <Field label="Achado Macroscópico Mais Importante"><TextArea value={f.diagnostico_macroscopico} onChange={e => setF({...f, diagnostico_macroscopico: e.target.value})} /></Field>
-        <Field label="Diagnóstico Definitivo / Hipótese Final"><TextArea value={f.diagnostico_final} onChange={e => setF({...f, diagnostico_final: e.target.value})} /></Field>
+        <Field label="Diagnóstico Definitivo / Hipótese"><TextArea value={f.diagnostico_final} onChange={e => setF({...f, diagnostico_final: e.target.value})} /></Field>
       </SecaoForm>
 
-      <div className="flex gap-2 pt-2 border-t"><Btn type="button" onClick={() => onSalvar({ ...f, id: f.id || genId("necro") })}>Arquivar Laudo Macroscópico</Btn><Btn type="button" variant="ghost" onClick={onCancelar}>Voltar</Btn></div>
+      <div className="flex gap-2 pt-2 border-t"><Btn type="button" onClick={() => onSalvar({ ...f, id: f.id || genId("necro") })}>Arquivar Laudo</Btn><Btn type="button" variant="ghost" onClick={onCancelar}>Voltar</Btn></div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Perfil Consolidado e Linha do Tempo (Animal Perfil)
+// Perfil Consolidado (Animal Perfil)
 // ---------------------------------------------------------------------------
 function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, voltar, onEditarAnimal, onExcluirAnimal }) {
   const animal = animais.find(a => a.sip === sip);
-  if (!animal) return <p className="text-sm p-6 text-gray-400">Animal não localizado no banco.</p>;
+  if (!animal) return <p className="text-sm p-6 text-gray-400">Animal não localizado.</p>;
 
   const as = atendimentos.filter(a => a.sip === sip);
   const rs = reproducoes.filter(r => r.sip === sip || r.reprodutor_id === sip);
@@ -887,7 +919,7 @@ function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, voltar, onEdit
   return (
     <div className="space-y-4 text-left">
       <div className="flex justify-between items-center">
-        <Btn variant="ghost" onClick={voltar} className="!px-2"><ArrowLeft size={14} /> Voltar para lista</Btn>
+        <Btn variant="ghost" onClick={voltar} className="!px-2"><ArrowLeft size={14} /> Voltar</Btn>
         <div className="flex gap-2">
           <Btn variant="danger" onClick={() => { if(confirm(`Deseja remover o registro de ${animal.sip}?`)) onExcluirAnimal(animal.sip); }}><Trash2 size={13} /> Excluir</Btn>
           <Btn onClick={() => onEditarAnimal(animal)} className="!bg-[#4A7C7C] hover:!bg-[#3A6363]"><Edit3 size={13} /> Editar Ficha</Btn>
@@ -898,27 +930,8 @@ function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, voltar, onEdit
         <div className="flex items-center gap-3"><SipBadge sip={animal.sip} linhagem={animal.linhagem} /><span className="text-base font-bold text-[#1B3A54]">{animal.linhagem} · {animal.sexo} · {animal.especie}</span></div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-4 text-xs text-gray-500 border-t pt-3">
           <div>Status Vitalidade: <strong className="text-gray-700">{animal.status || "Ativo"}</strong></div>
-          <div>Categoria do Animal: <strong className="text-gray-700">{animal.categoria || "Manutenção"}</strong></div>
-          <div>Tempo de Vida (Meses): <strong className="text-gray-700">{calcIdadeApenasMeses(animal.data_nascimento)}</strong></div>
-        </div>
-        {animal.observacoes && <div className="mt-3 text-xs bg-gray-50 p-2.5 rounded text-gray-600 border border-dashed italic">Notas Internas: {animal.observacoes}</div>}
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-white border rounded-lg p-4 shadow-sm">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3 border-b pb-1">Histórico Clínico Ambulatorial ({as.length})</h4>
-          <div className="space-y-2 max-h-56 overflow-y-auto">
-            {as.map(a => <div key={a.id} className="text-xs border-b border-gray-100 pb-1.5 last:border-0"><span className="text-gray-400 font-mono">{fmtDate(a.data)}:</span> <strong>{a.diagnostico || "Avaliação"}</strong> {a.desfecho && <span className="text-emerald-700 font-bold">({a.desfecho})</span>}</div>)}
-            {as.length === 0 && <p className="text-xs text-gray-400 italic">Nenhum evento registrado para este roedor.</p>}
-          </div>
-        </div>
-
-        <div className="bg-white border rounded-lg p-4 shadow-sm">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3 border-b pb-1">Acasalamentos e Colônia ({rs.length})</h4>
-          <div className="space-y-2 max-h-56 overflow-y-auto">
-            {rs.map(r => <div key={r.id} className="text-xs border-b border-gray-100 pb-1.5 last:border-0">Fêmea: <strong>{r.sip}</strong> × Macho: <strong>{r.reprodutor_id || "—"}</strong> {r.term_data_matriz ? <span className="text-amber-700 font-bold">(Inativo)</span> : <span className="text-emerald-700 font-bold">(Ativo)</span>}</div>)}
-            {rs.length === 0 && <p className="text-xs text-gray-400 italic">Este animal não faz parte de nenhuma colônia de acasalamento.</p>}
-          </div>
+          <div>Categoria: <strong className="text-gray-700">{animal.categoria || "Manutenção"}</strong></div>
+          <div>Tempo de Vida: <strong className="text-gray-700">{calcIdadeApenasMeses(animal.data_nascimento)}</strong></div>
         </div>
       </div>
     </div>
