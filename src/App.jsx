@@ -76,7 +76,10 @@ async function saveRecord(table, record) {
 
 async function deleteRecord(table, idField, idValue) {
   const { error } = await supabase.from(table).delete().eq(idField, idValue);
-  if (error) console.error(`Erro ao excluir de ${table}:`, error.message);
+  if (error) {
+    console.error(`Erro ao excluir de ${table}:`, error.message);
+    throw error;
+  }
 }
 
 function genId(prefix) {
@@ -93,7 +96,6 @@ function fmtDate(iso) {
   }
 }
 
-// Funções Auxiliares de Idade
 function calcIdadeApenasMeses(dataNasc) {
   if (!dataNasc) return "—";
   const nasc = new Date(dataNasc + "T00:00:00");
@@ -193,7 +195,7 @@ function Btn({ children, variant = "primary", ...props }) {
   const styles = {
     primary: "bg-[#1B3A54] text-white hover:bg-[#15293D]",
     ghost: "bg-transparent text-[#1B3A54] hover:bg-[#1B3A54]/8",
-    danger: "bg-transparent text-[#A6493C] hover:bg-[#A6493C]/10",
+    danger: "bg-transparent text-[#A6493C] hover:bg-[#A6493C]/10 border border-[#A6493C]/20",
   };
   return (
     <button {...props} className={`${base} ${styles[variant]} ${props.className || ""}`}>
@@ -245,8 +247,6 @@ export default function App() {
   const [toast, setToast] = useState(null);
 
   const [session, setSession] = useState(undefined);
-
-  // Estado para capturar quando pedimos edição de animal direto da ficha de detalhe
   const [animalParaEditar, setAnimalParaEditar] = useState(null);
 
   useEffect(() => {
@@ -297,6 +297,18 @@ export default function App() {
     await supabase.auth.signOut();
   }
 
+  // Função central para apagar animal e atualizar a tela
+  async function tratarExcluirAnimal(sip) {
+    try {
+      await deleteRecord("animais", "sip", sip);
+      showToast("Animal excluído com sucesso");
+      setModulo("animais");
+      loadAll();
+    } catch (err) {
+      showToast("Erro ao excluir. Verifique vínculos clínicos.");
+    }
+  }
+
   const buscaLower = busca.trim().toLowerCase();
   const resultadosBusca = buscaLower
     ? animais.filter(
@@ -323,7 +335,7 @@ export default function App() {
                 key={m.id}
                 onClick={() => {
                   setModulo(m.id);
-                  setAnimalParaEditar(null); // Reseta estados de edição ao trocar de módulo
+                  setAnimalParaEditar(null);
                 }}
                 className={`w-full flex items-center gap-3 px-5 py-2.5 text-sm transition-colors ${
                   active ? "bg-white/10 text-white font-medium" : "text-[#B8CBD6] hover:bg-white/5 hover:text-white"
@@ -399,9 +411,10 @@ export default function App() {
                 reproducoes={reproducoes}
                 necropsias={necropsias}
                 voltar={() => setModulo("animais")}
+                onExcluirAnimal={tratarExcluirAnimal}
                 onEditarAnimal={(animalData) => {
                   setAnimalParaEditar(animalData);
-                  setModulo("animais"); // Direciona para o módulo de animais onde o formulário abrirá em modo edição
+                  setModulo("animais");
                 }}
               />
             )}
@@ -535,14 +548,13 @@ function Dashboard({ animais, atendimentos, necropsias, reproducoes, goTo }) {
 }
 
 // ---------------------------------------------------------------------------
-// Módulo Animais (Com Suporte a Edição)
+// Módulo Animais
 // ---------------------------------------------------------------------------
 
 function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparForcarEdicao }) {
   const [form, setForm] = useState(null);
   const [salvando, setSalvando] = useState(false);
 
-  // Efeito para abrir o formulário automaticamente se vier uma solicitação de edição externa
   useEffect(() => {
     if (forcarEdicao) {
       setForm(forcarEdicao);
@@ -598,7 +610,7 @@ function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparF
 }
 
 function AnimalForm({ inicial, animaisExistentes, onSalvar, onCancelar, salvando }) {
-  const isEdicao = !!inicial?.sip; // Verifica se é uma edição de registro existente
+  const isEdicao = !!inicial?.sip;
   
   const [f, setF] = useState({
     sip: "", linhagem: LINHAGENS[0], sexo: "Fêmea", data_nascimento: "", origem: "", categoria: "", 
@@ -725,9 +737,11 @@ function ModuloAtendimentos({ atendimentos, animais, reload, showToast }) {
   }
 
   async function excluir(id) {
-    await deleteRecord("atendimentos", "id", id);
-    showToast("Atendimento excluído");
-    reload();
+    if (confirm("Deseja realmente excluir esta ficha de atendimento?")) {
+      await deleteRecord("atendimentos", "id", id);
+      showToast("Atendimento excluído");
+      reload();
+    }
   }
 
   const lista = filtroSip ? atendimentos.filter((a) => a.sip === filtroSip) : atendimentos;
@@ -870,7 +884,7 @@ function AtendimentoForm({ inicial, animais, onSalvar, onCancelar }) {
     sist_comportamental: "", sist_dermatologico: "", sist_respiratorio: "",
     sist_digestorio: "", sist_neurologico: "", sist_reprodutivo: "",
     sinais_objetivos: "",
-    diagnostico: "", conduta: "", tratamento: "", exames_laboratoriais: "",
+    diagnostico: "", conduta: "", treatment: "", exames_laboratoriais: "",
     medicamento_nome: "", medicamento_dosagem: "", medicamento_via: "", medicamento_frequencia: "",
     evolucoes: [],
     retorno: "", desfecho: "",
@@ -1044,9 +1058,11 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
   }
 
   async function excluir(id) {
-    await deleteRecord("reproducao", "id", id);
-    showToast("Prontuário excluído");
-    reload();
+    if (confirm("Deseja realmente excluir este prontuário reprodutivo?")) {
+      await deleteRecord("reproducao", "id", id);
+      showToast("Prontuário excluído");
+      reload();
+    }
   }
 
   return (
@@ -1371,9 +1387,11 @@ function ModuloNecropsias({ necropsias, animais, reload, showToast }) {
   }
 
   async function excluir(id) {
-    await deleteRecord("necropsias", "id", id);
-    showToast("Necropsia excluída");
-    reload();
+    if (confirm("Deseja realmente excluir este laudo de necropsia?")) {
+      await deleteRecord("necropsias", "id", id);
+      showToast("Necropsia excluída");
+      reload();
+    }
   }
 
   return (
@@ -1551,10 +1569,10 @@ function NecropsiaForm({ inicial, animais, onSalvar, onCancelar }) {
 }
 
 // ---------------------------------------------------------------------------
-// Detalhe do animal (Com Botão de Edição Liberado)
+// Detalhe do animal
 // ---------------------------------------------------------------------------
 
-function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, necropsias, voltar, onEditarAnimal }) {
+function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, necropsias, voltar, onEditarAnimal, onExcluirAnimal }) {
   const animal = animais.find((a) => a.sip === sip);
   if (!animal) return <p className="text-sm text-[#8A8574]">Animal não encontrado.</p>;
 
@@ -1568,10 +1586,23 @@ function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, necropsias, vo
       <div className="flex items-center justify-between mb-4">
         <Btn variant="ghost" onClick={voltar} className="!px-2"><ArrowLeft size={14} /> Voltar</Btn>
         
-        {/* Nova Funcionalidade: Botão disparador de edição das fichas de animais */}
-        <Btn onClick={() => onEditarAnimal(animal)} className="!bg-[#4A7C7C] hover:!bg-[#3A6363]">
-          <Edit3 size={14} /> Editar Dados do Animal
-        </Btn>
+        <div className="flex gap-2">
+          {/* Nova Funcionalidade: Botão disparador para excluir a ficha do animal */}
+          <Btn 
+            variant="danger"
+            onClick={() => {
+              if (confirm(`Aviso: Tem certeza que deseja excluir permanentemente o animal ${animal.sip}? Isso não afetará os laudos associados de atendimento/necropsia.`)) {
+                onExcluirAnimal(animal.sip);
+              }
+            }}
+          >
+            <Trash2 size={14} /> Excluir Animal
+          </Btn>
+
+          <Btn onClick={() => onEditarAnimal(animal)} className="!bg-[#4A7C7C] hover:!bg-[#3A6363]">
+            <Edit3 size={14} /> Editar Dados do Animal
+          </Btn>
+        </div>
       </div>
       
       <div className="flex items-center gap-3 mb-1">
