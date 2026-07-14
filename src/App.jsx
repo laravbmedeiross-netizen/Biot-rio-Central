@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Search, Plus, ChevronRight, X, Save, Home, PawPrint, Stethoscope,
-  Heart, Skull, AlertTriangle, Trash2, ArrowLeft, Loader2, Check, LogOut, Edit3, Calendar
+  Heart, Skull, AlertTriangle, Trash2, ArrowLeft, Loader2, Check, LogOut, Edit3, Calendar, BookOpen
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import Login from "./Login";
@@ -34,6 +34,7 @@ const MODULOS = [
   { id: "atendimentos", label: "Atendimentos", icon: Stethoscope },
   { id: "reproducao", label: "Reprodução", icon: Heart },
   { id: "necropsias", label: "Necropsias", icon: Skull },
+  { id: "bulario", label: "Bulário", icon: BookOpen },
 ];
 
 const CHECKBOXES_PELE_PELAGEM = [
@@ -242,6 +243,7 @@ export default function App() {
   const [atendimentos, setAtendimentos] = useState([]);
   const [reproducoes, setReproducoes] = useState([]);
   const [necropsias, setNecropsias] = useState([]);
+  const [bulario, setBulario] = useState([]);
   const [busca, setBusca] = useState("");
   const [toast, setToast] = useState(null);
   const [session, setSession] = useState(undefined);
@@ -255,16 +257,18 @@ export default function App() {
 
   const loadAll = useCallback(async () => {
     setLoading(true);
-    const [a, at, r, n] = await Promise.all([
+    const [a, at, r, n, b] = await Promise.all([
       listRecords("animais"),
       listRecords("atendimentos", "data"),
       listRecords("reproducao"),
       listRecords("necropsias", "data"),
+      listRecords("bulario_medicamentos"),
     ]);
     setAnimais(a.sort((x, y) => (x.sip || "").localeCompare(y.sip || "")));
     setAtendimentos(at);
     setReproducoes(r);
     setNecropsias(n);
+    setBulario(b.sort((x, y) => (x.nome || "").localeCompare(y.nome || "")));
     setLoading(false);
   }, []);
 
@@ -338,9 +342,10 @@ export default function App() {
             <>
               {modulo === "dashboard" && <Dashboard animais={animais} atendimentos={atendimentos} necropsias={necropsias} reproducoes={reproducoes} goTo={setModulo} />}
               {modulo === "animais" && <ModuloAnimais animais={animais} reload={loadAll} showToast={showToast} goTo={setModulo} forcarEdicao={animalParaEditar} limparForcarEdicao={() => setAnimalParaEditar(null)} />}
-              {modulo === "atendimentos" && <ModuloAtendimentos atendimentos={atendimentos} animais={animais} reload={loadAll} showToast={showToast} />}
+              {modulo === "atendimentos" && <ModuloAtendimentos atendimentos={atendimentos} animais={animais} bulario={bulario} reload={loadAll} showToast={showToast} />}
               {modulo === "reproducao" && <ModuloReproducao reproducoes={reproducoes} animais={animais} reload={loadAll} showToast={showToast} />}
               {modulo === "necropsias" && <ModuloNecropsias necropsias={necropsias} animais={animais} reload={loadAll} showToast={showToast} />}
+              {modulo === "bulario" && <ModuloBulario bulario={bulario} reload={loadAll} showToast={showToast} />}
               {modulo.startsWith("animal-detalhe:") && (
                 <AnimalDetalhe sip={modulo.split(":")[1]} animais={animais} atendimentos={atendimentos} reproducoes={reproducoes} voltar={() => setModulo("animais")} onExcluirAnimal={tratarExcluirAnimal} onEditarAnimal={d => { setAnimalParaEditar(d); setModulo("animais"); }} />
               )}
@@ -497,7 +502,7 @@ function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparF
 // ---------------------------------------------------------------------------
 // Módulo Atendimentos
 // ---------------------------------------------------------------------------
-function ModuloAtendimentos({ atendimentos, animais, reload, showToast }) {
+function ModuloAtendimentos({ atendimentos, animais, bulario = [], reload, showToast }) {
   const [form, setForm] = useState(null);
   const [aba, setAba] = useState("andamento");
   const [aberto, setAberto] = useState(null);
@@ -518,7 +523,7 @@ function ModuloAtendimentos({ atendimentos, animais, reload, showToast }) {
       </div>
 
       {form && (
-        <AtendimentoFormCompleto inicial={form} animais={animais} onCancelar={() => setForm(null)} onSalvar={async d => {
+        <AtendimentoFormCompleto inicial={form} animais={animais} bulario={bulario} onCancelar={() => setForm(null)} onSalvar={async d => {
           try { await saveRecord("atendimentos", d); setForm(null); showToast("Ficha gravada com sucesso"); reload(); }
           catch (err) { console.error(err); alert("Erro ao salvar: " + (err.message || "verifique os campos.")); }
         }} />
@@ -605,7 +610,7 @@ function ModuloAtendimentos({ atendimentos, animais, reload, showToast }) {
   );
 }
 
-function AtendimentoFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
+function AtendimentoFormCompleto({ inicial, animais, bulario = [], onSalvar, onCancelar }) {
   const [f, setF] = useState({
     sip: "", data: new Date().toISOString().slice(0, 10), responsavel: "", motivo_chamado: "Avaliação clínica",
     escore_corporal: "BC3", cromo: "0", peso: "", diagnostico: "", conduta_adotada: "", descricao_atendimento: "",
@@ -667,6 +672,27 @@ function AtendimentoFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
 
         <div className="bg-white p-3 border rounded space-y-2">
           <span className="block text-[10px] font-bold uppercase text-gray-400">Adicionar Conduta Farmacológica</span>
+          {bulario.length > 0 && (
+            <Select value="" onChange={e => {
+              const med = bulario.find(b => b.id === e.target.value);
+              if (!med) return;
+              const pesoKg = Number(f.peso) / 1000;
+              const doseCalculada = med.dose_mg_kg && pesoKg > 0
+                ? `${(Number(med.dose_mg_kg) * pesoKg).toFixed(2)} mg (${med.dose_mg_kg} mg/kg × ${pesoKg}kg)`
+                : (med.dose_mg_kg ? `${med.dose_mg_kg} mg/kg` : "");
+              setLinhaTrat({
+                med: med.nome, dose: doseCalculada,
+                via: med.via_recomendada || "", freq: med.frequencia_recomendada || "",
+                duracao: "", resp: "",
+              });
+            }}>
+              <option value="">Selecionar do bulário (preenche dose automática)…</option>
+              {bulario.map(b => <option key={b.id} value={b.id}>{b.nome}{b.dose_mg_kg ? ` — ${b.dose_mg_kg} mg/kg` : ""}</option>)}
+            </Select>
+          )}
+          {!f.peso && bulario.length > 0 && (
+            <p className="text-xs text-[#C9852B]">Preencha o peso do animal na seção 2 para calcular a dose automaticamente.</p>
+          )}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
             <TextInput placeholder="Medicamento" value={linhaTrat.med} onChange={e => setLinhaTrat({...linhaTrat, med: e.target.value})} />
             <TextInput placeholder="Dose (ex: 2mg/kg)" value={linhaTrat.dose} onChange={e => setLinhaTrat({...linhaTrat, dose: e.target.value})} />
@@ -1020,6 +1046,112 @@ function NecropsiaFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
 }
 
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Bulário interno
+// ---------------------------------------------------------------------------
+
+function ModuloBulario({ bulario, reload, showToast }) {
+  const [form, setForm] = useState(null);
+
+  async function salvar(dados) {
+    const id = dados.id || genId("bul");
+    try {
+      await saveRecord("bulario_medicamentos", { ...dados, id });
+      setForm(null);
+      showToast("Medicamento salvo no bulário");
+      reload();
+    } catch (err) {
+      alert("Erro ao salvar: " + (err.message || "verifique os campos."));
+    }
+  }
+
+  async function excluir(id) {
+    try {
+      await deleteRecord("bulario_medicamentos", "id", id);
+      showToast("Medicamento removido");
+      reload();
+    } catch {
+      showToast("Não foi possível remover.");
+    }
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h2 className="text-xl font-semibold">Bulário interno</h2>
+          <p className="text-sm text-[#8A8574]">Medicamentos com dose recomendada por kg — usado para sugestão automática no atendimento.</p>
+        </div>
+        <Btn onClick={() => setForm({})}><Plus size={14} /> Novo medicamento</Btn>
+      </div>
+
+      {form && <BularioForm inicial={form} onSalvar={salvar} onCancelar={() => setForm(null)} />}
+
+      {bulario.length === 0 && !form ? (
+        <EmptyState icon={BookOpen} title="Nenhum medicamento cadastrado" subtitle="Cadastre os medicamentos que vocês mais usam, com a dose por kg." action={<Btn onClick={() => setForm({})}><Plus size={14} /> Novo medicamento</Btn>} />
+      ) : (
+        <div className="grid gap-2">
+          {bulario.map((m) => (
+            <div key={m.id} className="bg-white border border-[#E4E0D4] rounded-lg p-4">
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-medium text-[#2B2B24]">{m.nome}</span>
+                <div className="flex gap-1">
+                  <Btn variant="ghost" onClick={() => setForm(m)} className="!px-2 !py-1 text-xs">Editar</Btn>
+                  <Btn variant="danger" onClick={() => excluir(m.id)} className="!px-2 !py-1 text-xs"><Trash2 size={13} /></Btn>
+                </div>
+              </div>
+              <p className="text-sm text-[#5C5C52]">
+                {m.dose_mg_kg ? `${m.dose_mg_kg} mg/kg` : "dose não informada"}
+                {m.via_recomendada ? ` · via ${m.via_recomendada}` : ""}
+                {m.frequencia_recomendada ? ` · ${m.frequencia_recomendada}` : ""}
+              </p>
+              {m.observacoes && <p className="text-xs text-[#8A8574] mt-1">{m.observacoes}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BularioForm({ inicial, onSalvar, onCancelar }) {
+  const [f, setF] = useState({ nome: "", dose_mg_kg: "", via_recomendada: "", frequencia_recomendada: "", observacoes: "", ...inicial });
+  const [erro, setErro] = useState("");
+
+  function submit(e) {
+    e.preventDefault();
+    if (!f.nome.trim()) return setErro("Nome do medicamento é obrigatório.");
+    setErro("");
+    onSalvar(f);
+  }
+
+  return (
+    <form onSubmit={submit} className="bg-white border border-[#E4E0D4] rounded-lg p-5 mb-5">
+      <div className="grid grid-cols-2 gap-x-4">
+        <Field label="Nome do medicamento" required>
+          <TextInput value={f.nome} onChange={(e) => setF({ ...f, nome: e.target.value })} placeholder="Ex: Meloxicam 2mg/ml" />
+        </Field>
+        <Field label="Dose recomendada (mg/kg)">
+          <TextInput type="number" step="any" value={f.dose_mg_kg} onChange={(e) => setF({ ...f, dose_mg_kg: e.target.value })} placeholder="Ex: 1" />
+        </Field>
+        <Field label="Via recomendada">
+          <TextInput value={f.via_recomendada} onChange={(e) => setF({ ...f, via_recomendada: e.target.value })} placeholder="Ex: SC, VO, IM" />
+        </Field>
+        <Field label="Frequência recomendada">
+          <TextInput value={f.frequencia_recomendada} onChange={(e) => setF({ ...f, frequencia_recomendada: e.target.value })} placeholder="Ex: 1x/dia" />
+        </Field>
+      </div>
+      <Field label="Observações"><TextArea value={f.observacoes} onChange={(e) => setF({ ...f, observacoes: e.target.value })} placeholder="Contraindicações, cuidados, etc." /></Field>
+
+      {erro && <p className="text-sm text-[#A6493C] mb-3">{erro}</p>}
+      <div className="flex gap-2">
+        <Btn type="submit"><Save size={14} /> Salvar</Btn>
+        <Btn type="button" variant="ghost" onClick={onCancelar}>Cancelar</Btn>
+      </div>
+    </form>
+  );
+}
+
 function resolveAnimalPorSip(sipVal, animais) {
   if (!sipVal) return null;
   return animais.find((a) => a.sip === sipVal) || null;
