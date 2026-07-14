@@ -367,6 +367,16 @@ function Dashboard({ animais, atendimentos, necropsias, reproducoes, goTo }) {
   const clinicosAtivos = atendimentos.filter(at => !at.desfecho || at.desfecho.trim() === "");
   const casaisAtivos = reproducoes.filter(r => !r.term_data_matriz && !r.term_data_reprodutor);
 
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  const retornosPendentes = atendimentos
+    .filter(at => at.data_retorno && (!at.desfecho || at.desfecho.trim() === ""))
+    .map(at => {
+      const dataRet = new Date(at.data_retorno + "T00:00:00");
+      const diffDias = Math.round((dataRet - hoje) / 86400000);
+      return { ...at, diffDias };
+    })
+    .sort((a, b) => a.diffDias - b.diffDias);
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
@@ -382,6 +392,33 @@ function Dashboard({ animais, atendimentos, necropsias, reproducoes, goTo }) {
             <div className="text-xs text-gray-500 font-bold uppercase tracking-wider">{card.label}</div>
           </button>
         ))}
+      </div>
+
+      <div className="bg-white border rounded-lg p-5 shadow-sm text-left">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center gap-1"><Calendar size={14}/> Retornos Pendentes ({retornosPendentes.length})</h3>
+        {retornosPendentes.length === 0 ? (
+          <p className="text-sm text-gray-400 italic">Nenhum retorno agendado no momento.</p>
+        ) : (
+          <div className="space-y-1.5">
+            {retornosPendentes.map(r => {
+              const animal = animais.find(a => a.sip === r.sip);
+              const atrasado = r.diffDias < 0;
+              const hojeMesmo = r.diffDias === 0;
+              return (
+                <button key={r.id} onClick={() => goTo("atendimentos")} className="w-full flex items-center justify-between text-left px-3 py-2 rounded border hover:border-[#4A7C7C] transition-colors"
+                  style={{ borderColor: atrasado ? "#A6493C" : hojeMesmo ? "#C9852B" : "#E4E0D4", backgroundColor: atrasado ? "#A6493C0A" : hojeMesmo ? "#C9852B0A" : "white" }}>
+                  <div className="flex items-center gap-3">
+                    <SipBadge sip={r.sip} linhagem={animal?.linhagem} />
+                    <span className="text-xs text-gray-500">{r.diagnostico || r.motivo_chamado || "Avaliação"}</span>
+                  </div>
+                  <span className={`text-xs font-bold ${atrasado ? "text-[#A6493C]" : hojeMesmo ? "text-[#C9852B]" : "text-gray-500"}`}>
+                    {atrasado ? `Atrasado ${Math.abs(r.diffDias)}d` : hojeMesmo ? "Hoje" : `Em ${r.diffDias}d`} · {fmtDate(r.data_retorno)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="bg-white border rounded-lg p-5 shadow-sm text-left">
@@ -575,6 +612,7 @@ function ModuloAtendimentos({ atendimentos, animais, bulario = [], reload, showT
                   <DetalheCampo label="Conduta Adotada" valor={at.conduta_adotada} />
                   <DetalheCampo label="Anotações / Descrição" valor={at.descricao_atendimento} />
                   <DetalheCampo label="Desfecho / Data Fechamento" valor={at.desfecho ? `${at.desfecho} (Em ${fmtDate(at.data_desfecho)})` : null} />
+                  <DetalheCampo label="Retorno previsto" valor={at.data_retorno ? fmtDate(at.data_retorno) : null} />
 
                   {Array.isArray(at.tratamentos) && at.tratamentos.length > 0 && (
                     <div className="border rounded-md overflow-hidden text-xs bg-white shadow-inner">
@@ -614,7 +652,7 @@ function AtendimentoFormCompleto({ inicial, animais, bulario = [], onSalvar, onC
   const [f, setF] = useState({
     sip: "", data: new Date().toISOString().slice(0, 10), responsavel: "", motivo_chamado: "Avaliação clínica",
     escore_corporal: "BC3", cromo: "0", peso: "", diagnostico: "", conduta_adotada: "", descricao_atendimento: "",
-    tratamentos: [], procedimentos: [], reavaliacoes: [], desfecho: "", data_desfecho: "", ...inicial
+    tratamentos: [], procedimentos: [], reavaliacoes: [], desfecho: "", data_desfecho: "", data_retorno: "", ...inicial
   });
 
   const [linhaTrat, setLinhaTrat] = useState({ med: "", dose: "", via: "", freq: "", duracao: "", resp: "" });
@@ -732,6 +770,7 @@ function AtendimentoFormCompleto({ inicial, animais, bulario = [], onSalvar, onC
       <SecaoForm titulo="5. Desfecho do Atendimento (Arquivamento)">
         <Field label="Opção de Desfecho Final"><Select value={f.desfecho} onChange={e => setF({...f, desfecho: e.target.value})}><option value="">Em acompanhamento...</option><option>Alta clínica</option><option>Eutanásia humanitária</option><option>Óbito natural</option><option>Retirada da reprodução</option><option>Encaminhado para necropsia</option></Select></Field>
         <Field label="Data de Fechamento do Caso"><TextInput type="date" value={f.data_desfecho} onChange={e => setF({...f, data_desfecho: e.target.value})} /></Field>
+        <Field label="Data prevista de retorno / reavaliação"><TextInput type="date" value={f.data_retorno} onChange={e => setF({...f, data_retorno: e.target.value})} /></Field>
       </SecaoForm>
 
       <div className="flex gap-2 pt-2 border-t"><Btn type="button" onClick={() => onSalvar({ ...f, id: f.id || genId("atd") })}>Gravar Prontuário</Btn><Btn type="button" variant="ghost" onClick={onCancelar}>Voltar</Btn></div>
