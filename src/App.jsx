@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Search, Plus, ChevronRight, X, Save, Home, PawPrint, Stethoscope,
-  Heart, Skull, AlertTriangle, Trash2, ArrowLeft, Loader2, Check, LogOut, Edit3, Calendar, Package, Minus
+  Heart, Skull, AlertTriangle, Trash2, ArrowLeft, Loader2, Check, LogOut, Edit3, Calendar
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import Login from "./Login";
@@ -34,7 +34,6 @@ const MODULOS = [
   { id: "atendimentos", label: "Atendimentos", icon: Stethoscope },
   { id: "reproducao", label: "Reprodução", icon: Heart },
   { id: "necropsias", label: "Necropsias", icon: Skull },
-  { id: "estoque", label: "Estoque", icon: Package },
 ];
 
 const CHECKBOXES_PELE_PELAGEM = [
@@ -243,8 +242,6 @@ export default function App() {
   const [atendimentos, setAtendimentos] = useState([]);
   const [reproducoes, setReproducoes] = useState([]);
   const [necropsias, setNecropsias] = useState([]);
-  const [medicamentos, setMedicamentos] = useState([]);
-  const [movimentacoes, setMovimentacoes] = useState([]);
   const [busca, setBusca] = useState("");
   const [toast, setToast] = useState(null);
   const [session, setSession] = useState(undefined);
@@ -258,20 +255,16 @@ export default function App() {
 
   const loadAll = useCallback(async () => {
     setLoading(true);
-    const [a, at, r, n, m, mv] = await Promise.all([
+    const [a, at, r, n] = await Promise.all([
       listRecords("animais"),
       listRecords("atendimentos", "data"),
       listRecords("reproducao"),
       listRecords("necropsias", "data"),
-      listRecords("estoque_medicamentos"),
-      listRecords("estoque_movimentacoes", "data"),
     ]);
     setAnimais(a.sort((x, y) => (x.sip || "").localeCompare(y.sip || "")));
     setAtendimentos(at);
     setReproducoes(r);
     setNecropsias(n);
-    setMedicamentos(m.sort((x, y) => (x.nome || "").localeCompare(y.nome || "")));
-    setMovimentacoes(mv);
     setLoading(false);
   }, []);
 
@@ -345,10 +338,9 @@ export default function App() {
             <>
               {modulo === "dashboard" && <Dashboard animais={animais} atendimentos={atendimentos} necropsias={necropsias} reproducoes={reproducoes} goTo={setModulo} />}
               {modulo === "animais" && <ModuloAnimais animais={animais} reload={loadAll} showToast={showToast} goTo={setModulo} forcarEdicao={animalParaEditar} limparForcarEdicao={() => setAnimalParaEditar(null)} />}
-              {modulo === "atendimentos" && <ModuloAtendimentos atendimentos={atendimentos} animais={animais} medicamentos={medicamentos} reload={loadAll} showToast={showToast} />}
+              {modulo === "atendimentos" && <ModuloAtendimentos atendimentos={atendimentos} animais={animais} reload={loadAll} showToast={showToast} />}
               {modulo === "reproducao" && <ModuloReproducao reproducoes={reproducoes} animais={animais} reload={loadAll} showToast={showToast} />}
               {modulo === "necropsias" && <ModuloNecropsias necropsias={necropsias} animais={animais} reload={loadAll} showToast={showToast} />}
-              {modulo === "estoque" && <ModuloEstoque medicamentos={medicamentos} movimentacoes={movimentacoes} reload={loadAll} showToast={showToast} />}
               {modulo.startsWith("animal-detalhe:") && (
                 <AnimalDetalhe sip={modulo.split(":")[1]} animais={animais} atendimentos={atendimentos} reproducoes={reproducoes} voltar={() => setModulo("animais")} onExcluirAnimal={tratarExcluirAnimal} onEditarAnimal={d => { setAnimalParaEditar(d); setModulo("animais"); }} />
               )}
@@ -505,7 +497,7 @@ function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparF
 // ---------------------------------------------------------------------------
 // Módulo Atendimentos
 // ---------------------------------------------------------------------------
-function ModuloAtendimentos({ atendimentos, animais, medicamentos, reload, showToast }) {
+function ModuloAtendimentos({ atendimentos, animais, reload, showToast }) {
   const [form, setForm] = useState(null);
   const [aba, setAba] = useState("andamento");
   const [aberto, setAberto] = useState(null);
@@ -526,25 +518,8 @@ function ModuloAtendimentos({ atendimentos, animais, medicamentos, reload, showT
       </div>
 
       {form && (
-        <AtendimentoFormCompleto inicial={form} animais={animais} medicamentos={medicamentos} onCancelar={() => setForm(null)} onSalvar={async d => {
-          const ehNova = !form.id;
-          try {
-            await saveRecord("atendimentos", d);
-            if (ehNova && Array.isArray(d.tratamentos)) {
-              for (const t of d.tratamentos) {
-                if (t.medicamento_id && t.quantidade) {
-                  const med = medicamentos.find(m => m.id === t.medicamento_id);
-                  if (med) {
-                    await registrarMovimentacao({
-                      medicamentoId: med.id, tipo: "saida", quantidade: t.quantidade,
-                      motivo: `Atendimento ${d.sip} - ${fmtDate(d.data)}`, sipAnimal: d.sip, medicamentoAtual: med,
-                    });
-                  }
-                }
-              }
-            }
-            setForm(null); showToast("Ficha gravada com sucesso"); reload();
-          }
+        <AtendimentoFormCompleto inicial={form} animais={animais} onCancelar={() => setForm(null)} onSalvar={async d => {
+          try { await saveRecord("atendimentos", d); setForm(null); showToast("Ficha gravada com sucesso"); reload(); }
           catch (err) { console.error(err); alert("Erro ao salvar: " + (err.message || "verifique os campos.")); }
         }} />
       )}
@@ -630,17 +605,15 @@ function ModuloAtendimentos({ atendimentos, animais, medicamentos, reload, showT
   );
 }
 
-function AtendimentoFormCompleto({ inicial, animais, medicamentos = [], onSalvar, onCancelar }) {
+function AtendimentoFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
   const [f, setF] = useState({
     sip: "", data: new Date().toISOString().slice(0, 10), responsavel: "", motivo_chamado: "Avaliação clínica",
     escore_corporal: "BC3", cromo: "0", peso: "", diagnostico: "", conduta_adotada: "", descricao_atendimento: "",
     tratamentos: [], procedimentos: [], reavaliacoes: [], desfecho: "", data_desfecho: "", ...inicial
   });
 
-  const [linhaTrat, setLinhaTrat] = useState({ medicamento_id: "", med: "", dose: "", via: "", freq: "", quantidade: "", duracao: "", resp: "" });
+  const [linhaTrat, setLinhaTrat] = useState({ med: "", dose: "", via: "", freq: "", duracao: "", resp: "" });
   const [linhaReav, setLinhaReav] = useState({ data: "", ev: "", param: "", cond: "manter", resp: "" });
-
-  const medSelecionado = medicamentos.find((m) => m.id === linhaTrat.medicamento_id);
 
   return (
     <div className="bg-white border rounded-lg p-5 space-y-4 text-left shadow-md">
@@ -674,14 +647,14 @@ function AtendimentoFormCompleto({ inicial, animais, medicamentos = [], onSalvar
         {Array.isArray(f.tratamentos) && f.tratamentos.length > 0 && (
           <div className="border rounded overflow-hidden bg-white">
             <table className="w-full text-left text-xs">
-              <thead><tr className="bg-gray-100 border-b text-gray-500 font-bold"><th className="p-1.5">Medicamento</th><th className="p-1.5">Dose</th><th className="p-1.5">Via/Freq</th><th className="p-1.5">Qtd</th><th className="p-1.5"></th></tr></thead>
+              <thead><tr className="bg-gray-100 border-b text-gray-500 font-bold"><th className="p-1.5">Medicamento</th><th className="p-1.5">Dose</th><th className="p-1.5">Via</th><th className="p-1.5">Frequência</th><th className="p-1.5"></th></tr></thead>
               <tbody>
                 {f.tratamentos.map((t, i) => (
                   <tr key={i} className="border-b last:border-0">
                     <td className="p-1.5">{t.med}</td>
                     <td className="p-1.5">{t.dose}</td>
-                    <td className="p-1.5">{t.via}{t.freq ? ` · ${t.freq}` : ""}</td>
-                    <td className="p-1.5">{t.quantidade || "—"}</td>
+                    <td className="p-1.5">{t.via}</td>
+                    <td className="p-1.5">{t.freq}</td>
                     <td className="p-1.5">
                       <button type="button" onClick={() => setF({...f, tratamentos: f.tratamentos.filter((_, idx) => idx !== i)})} className="text-[#A6493C]"><X size={13} /></button>
                     </td>
@@ -694,28 +667,17 @@ function AtendimentoFormCompleto({ inicial, animais, medicamentos = [], onSalvar
 
         <div className="bg-white p-3 border rounded space-y-2">
           <span className="block text-[10px] font-bold uppercase text-gray-400">Adicionar Conduta Farmacológica</span>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            <Select value={linhaTrat.medicamento_id} onChange={e => {
-              const med = medicamentos.find(m => m.id === e.target.value);
-              setLinhaTrat({...linhaTrat, medicamento_id: e.target.value, med: med ? med.nome : ""});
-            }}>
-              <option value="">Selecione do estoque…</option>
-              {medicamentos.map(m => <option key={m.id} value={m.id}>{m.nome} ({m.quantidade_atual} {m.unidade})</option>)}
-            </Select>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <TextInput placeholder="Medicamento" value={linhaTrat.med} onChange={e => setLinhaTrat({...linhaTrat, med: e.target.value})} />
             <TextInput placeholder="Dose (ex: 2mg/kg)" value={linhaTrat.dose} onChange={e => setLinhaTrat({...linhaTrat, dose: e.target.value})} />
             <TextInput placeholder="Via (ex: VO, SC, IM)" value={linhaTrat.via} onChange={e => setLinhaTrat({...linhaTrat, via: e.target.value})} />
             <TextInput placeholder="Frequência (ex: 2x/dia)" value={linhaTrat.freq} onChange={e => setLinhaTrat({...linhaTrat, freq: e.target.value})} />
-            <TextInput type="number" step="any" placeholder={`Qtd usada${medSelecionado ? ` (${medSelecionado.unidade})` : ""}`} value={linhaTrat.quantidade} onChange={e => setLinhaTrat({...linhaTrat, quantidade: e.target.value})} />
-            <TextInput placeholder="Nome (se não estiver no estoque)" value={!linhaTrat.medicamento_id ? linhaTrat.med : ""} onChange={e => setLinhaTrat({...linhaTrat, med: e.target.value, medicamento_id: ""})} disabled={!!linhaTrat.medicamento_id} />
           </div>
-          {medSelecionado && Number(linhaTrat.quantidade) > Number(medSelecionado.quantidade_atual) && (
-            <p className="text-xs text-[#A6493C]">Atenção: quantidade maior que o disponível em estoque ({medSelecionado.quantidade_atual} {medSelecionado.unidade}).</p>
-          )}
           <Btn type="button" variant="ghost" onClick={() => {
             if(!linhaTrat.med) return;
             const listaTrat = Array.isArray(f.tratamentos) ? f.tratamentos : [];
             setF({...f, tratamentos: [...listaTrat, linhaTrat]});
-            setLinhaTrat({ medicamento_id: "", med: "", dose: "", via: "", freq: "", quantidade: "", duracao: "", resp: "" });
+            setLinhaTrat({ med: "", dose: "", via: "", freq: "", duracao: "", resp: "" });
           }}>+ Incluir na Ficha</Btn>
         </div>
 
@@ -1057,212 +1019,6 @@ function NecropsiaFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Estoque de Medicamentos
-// ---------------------------------------------------------------------------
-
-async function registrarMovimentacao({ medicamentoId, tipo, quantidade, motivo, sipAnimal, medicamentoAtual }) {
-  const qtdAtual = Number(medicamentoAtual.quantidade_atual) || 0;
-  const delta = tipo === "entrada" ? Number(quantidade) : -Number(quantidade);
-  const novaQtd = qtdAtual + delta;
-  await saveRecord("estoque_medicamentos", { ...medicamentoAtual, quantidade_atual: novaQtd });
-  await saveRecord("estoque_movimentacoes", {
-    id: genId("mov"),
-    medicamento_id: medicamentoId,
-    tipo,
-    quantidade,
-    motivo,
-    sip_animal: sipAnimal || "",
-    data: new Date().toISOString().slice(0, 10),
-  });
-  return novaQtd;
-}
-
-function ModuloEstoque({ medicamentos, movimentacoes, reload, showToast }) {
-  const [form, setForm] = useState(null);
-  const [movForm, setMovForm] = useState(null);
-  const [aberto, setAberto] = useState(null);
-
-  async function salvarMedicamento(dados) {
-    const id = dados.id || genId("med");
-    try {
-      await saveRecord("estoque_medicamentos", { ...dados, id });
-      setForm(null);
-      showToast("Medicamento salvo");
-      reload();
-    } catch (err) {
-      alert("Erro ao salvar: " + (err.message || "verifique os campos."));
-    }
-  }
-
-  async function excluirMedicamento(id) {
-    try {
-      await deleteRecord("estoque_medicamentos", "id", id);
-      showToast("Medicamento removido");
-      reload();
-    } catch {
-      showToast("Não foi possível remover — existem movimentações vinculadas.");
-    }
-  }
-
-  async function registrarEntrada(med, quantidade, motivo) {
-    try {
-      await registrarMovimentacao({ medicamentoId: med.id, tipo: "entrada", quantidade, motivo, medicamentoAtual: med });
-      showToast("Entrada registrada");
-      setMovForm(null);
-      reload();
-    } catch (err) {
-      alert("Erro ao registrar entrada: " + (err.message || ""));
-    }
-  }
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h2 className="text-xl font-semibold">Estoque de medicamentos</h2>
-          <p className="text-sm text-[#8A8574]">Entradas, saídas e alerta de estoque baixo.</p>
-        </div>
-        <Btn onClick={() => setForm({})}><Plus size={14} /> Novo medicamento</Btn>
-      </div>
-
-      {form && <MedicamentoForm inicial={form} onSalvar={salvarMedicamento} onCancelar={() => setForm(null)} />}
-
-      {medicamentos.length === 0 && !form ? (
-        <EmptyState icon={Package} title="Nenhum medicamento cadastrado" subtitle="Cadastre o primeiro item do estoque." action={<Btn onClick={() => setForm({})}><Plus size={14} /> Novo medicamento</Btn>} />
-      ) : (
-        <div className="grid gap-2">
-          {medicamentos.map((m) => {
-            const baixo = Number(m.quantidade_atual) <= Number(m.quantidade_minima);
-            const isAberto = aberto === m.id;
-            const historico = movimentacoes.filter((mv) => mv.medicamento_id === m.id).sort((a, b) => new Date(b.data) - new Date(a.data));
-            return (
-              <div key={m.id} className="bg-white border border-[#E4E0D4] rounded-lg p-4">
-                <button type="button" onClick={() => setAberto(isAberto ? null : m.id)} className="w-full text-left">
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-3">
-                      <span className="font-medium text-[#2B2B24]">{m.nome}</span>
-                      {baixo && <span className="text-xs px-2 py-0.5 rounded-full bg-[#A6493C]/10 text-[#A6493C] flex items-center gap-1"><AlertTriangle size={11}/> Estoque baixo</span>}
-                    </div>
-                    <ChevronRight size={16} className={`text-[#B5AF9E] transition-transform ${isAberto ? "rotate-90" : ""}`} />
-                  </div>
-                  <p className="text-sm text-[#5C5C52]">
-                    {m.quantidade_atual} {m.unidade} disponíveis
-                    <span className="text-[#B5AF9E]"> · mínimo {m.quantidade_minima} {m.unidade}</span>
-                  </p>
-                </button>
-
-                {isAberto && (
-                  <div className="mt-3 pt-3 border-t border-[#E4E0D4]">
-                    <DetalheCampo label="Observações" valor={m.observacoes} />
-
-                    {movForm === m.id ? (
-                      <EntradaEstoqueForm
-                        unidade={m.unidade}
-                        onSalvar={(qtd, motivo) => registrarEntrada(m, qtd, motivo)}
-                        onCancelar={() => setMovForm(null)}
-                      />
-                    ) : (
-                      <Btn variant="ghost" onClick={() => setMovForm(m.id)} className="!px-2 !py-1 text-xs mb-2"><Plus size={13} /> Registrar entrada</Btn>
-                    )}
-
-                    {historico.length > 0 && (
-                      <div className="mb-2">
-                        <span className="block text-xs font-semibold uppercase tracking-wide text-[#5C5C52] mb-1">Movimentações</span>
-                        <div className="space-y-1">
-                          {historico.map((mv) => (
-                            <p key={mv.id} className="text-xs text-[#5C5C52]">
-                              <span className="text-[#B5AF9E]">{fmtDate(mv.data)}</span> ·{" "}
-                              <span className={mv.tipo === "entrada" ? "text-[#4A7C7C]" : "text-[#A6493C]"}>
-                                {mv.tipo === "entrada" ? "+" : "−"}{mv.quantidade} {m.unidade}
-                              </span>
-                              {mv.motivo ? ` · ${mv.motivo}` : ""}
-                              {mv.sip_animal ? ` · ${mv.sip_animal}` : ""}
-                            </p>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex gap-1 mt-3">
-                      <Btn variant="ghost" onClick={() => setForm(m)} className="!px-2 !py-1 text-xs">Editar</Btn>
-                      <Btn variant="danger" onClick={() => excluirMedicamento(m.id)} className="!px-2 !py-1 text-xs"><Trash2 size={13} /> Excluir</Btn>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function MedicamentoForm({ inicial, onSalvar, onCancelar }) {
-  const [f, setF] = useState({ nome: "", unidade: "un", quantidade_atual: "0", quantidade_minima: "0", observacoes: "", ...inicial });
-  const [erro, setErro] = useState("");
-
-  function submit(e) {
-    e.preventDefault();
-    if (!f.nome.trim()) return setErro("Nome do medicamento é obrigatório.");
-    setErro("");
-    onSalvar(f);
-  }
-
-  return (
-    <form onSubmit={submit} className="bg-white border border-[#E4E0D4] rounded-lg p-5 mb-5">
-      <div className="grid grid-cols-2 gap-x-4">
-        <Field label="Nome do medicamento" required>
-          <TextInput value={f.nome} onChange={(e) => setF({ ...f, nome: e.target.value })} placeholder="Ex: Meloxicam 2mg/ml" />
-        </Field>
-        <Field label="Unidade">
-          <Select value={f.unidade} onChange={(e) => setF({ ...f, unidade: e.target.value })}>
-            <option value="un">Unidade</option>
-            <option value="ml">ml</option>
-            <option value="mg">mg</option>
-            <option value="comprimido">Comprimido</option>
-            <option value="frasco">Frasco</option>
-            <option value="ampola">Ampola</option>
-          </Select>
-        </Field>
-        <Field label="Quantidade atual">
-          <TextInput type="number" step="any" value={f.quantidade_atual} onChange={(e) => setF({ ...f, quantidade_atual: e.target.value })} />
-        </Field>
-        <Field label="Estoque mínimo (alerta)">
-          <TextInput type="number" step="any" value={f.quantidade_minima} onChange={(e) => setF({ ...f, quantidade_minima: e.target.value })} />
-        </Field>
-      </div>
-      <Field label="Observações"><TextArea value={f.observacoes} onChange={(e) => setF({ ...f, observacoes: e.target.value })} /></Field>
-
-      {erro && <p className="text-sm text-[#A6493C] mb-3">{erro}</p>}
-      <div className="flex gap-2">
-        <Btn type="submit"><Save size={14} /> Salvar</Btn>
-        <Btn type="button" variant="ghost" onClick={onCancelar}>Cancelar</Btn>
-      </div>
-    </form>
-  );
-}
-
-function EntradaEstoqueForm({ unidade, onSalvar, onCancelar }) {
-  const [qtd, setQtd] = useState("");
-  const [motivo, setMotivo] = useState("");
-  return (
-    <div className="bg-[#F7F5F0] rounded-md p-3 mb-3">
-      <div className="grid grid-cols-2 gap-2 mb-2">
-        <TextInput type="number" step="any" placeholder={`Quantidade (${unidade})`} value={qtd} onChange={(e) => setQtd(e.target.value)} />
-        <TextInput placeholder="Motivo (ex: compra, doação)" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
-      </div>
-      <div className="flex gap-2">
-        <Btn type="button" onClick={() => { if (qtd) onSalvar(qtd, motivo); }} className="!px-3 !py-1 text-xs"><Plus size={13} /> Confirmar entrada</Btn>
-        <Btn type="button" variant="ghost" onClick={onCancelar} className="!px-3 !py-1 text-xs">Cancelar</Btn>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Perfil Consolidado (Animal Perfil)
 // ---------------------------------------------------------------------------
 function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, voltar, onEditarAnimal, onExcluirAnimal }) {
   const animal = animais.find(a => a.sip === sip);
