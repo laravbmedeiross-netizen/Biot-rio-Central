@@ -5,3 +5,19 @@
 body {
   margin: 0;
 }
+
+#area-impressao {
+  display: none;
+}
+
+@media print {
+  #app-root-ui {
+    display: none !important;
+  }
+  #area-impressao {
+    display: block !important;
+  }
+  @page {
+    margin: 1.5cm;
+  }
+}
