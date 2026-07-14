@@ -358,7 +358,7 @@ export default function App() {
               {modulo === "necropsias" && <ModuloNecropsias necropsias={necropsias} animais={animais} reload={loadAll} showToast={showToast} onImprimir={setImpressao} />}
               {modulo === "bulario" && <ModuloBulario bulario={bulario} reload={loadAll} showToast={showToast} />}
               {modulo.startsWith("animal-detalhe:") && (
-                <AnimalDetalhe sip={modulo.split(":")[1]} animais={animais} atendimentos={atendimentos} reproducoes={reproducoes} voltar={() => setModulo("animais")} onExcluirAnimal={tratarExcluirAnimal} onEditarAnimal={d => { setAnimalParaEditar(d); setModulo("animais"); }} />
+                <AnimalDetalhe sip={modulo.split(":")[1]} animais={animais} atendimentos={atendimentos} reproducoes={reproducoes} voltar={() => setModulo("animais")} onExcluirAnimal={tratarExcluirAnimal} onEditarAnimal={d => { setAnimalParaEditar(d); setModulo("animais"); }} onImprimir={setImpressao} />
               )}
             </>
           )}
@@ -1417,12 +1417,42 @@ function AreaImpressao({ impressao, animais }) {
         </>
       )}
 
+      {tipo === "animal" && (
+        <>
+          <CabecalhoImpressao titulo="Ficha Cadastral do Animal" sip={dados.sip} linhagem={dados.linhagem} data={dados.data_nascimento} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+            <CampoImpressao label="Espécie" valor={dados.especie} />
+            <CampoImpressao label="Sexo" valor={dados.sexo} />
+            <CampoImpressao label="Categoria" valor={dados.categoria} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+            <CampoImpressao label="Status" valor={dados.status} />
+            <CampoImpressao label="Origem" valor={dados.origem} />
+            <CampoImpressao label="Idade" valor={calcIdadeApenasMeses ? calcIdadeApenasMeses(dados.data_nascimento) : null} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <CampoImpressao label="Matriz Mãe" valor={dados.mae_id} />
+            <CampoImpressao label="Reprodutor Pai" valor={dados.pai_id} />
+          </div>
+          <CampoImpressao label="Responsável Técnico" valor={dados.responsavel_tecnico} />
+          {dados.categoria === "Experimentação" && <CampoImpressao label="Protocolo CEUA" valor={dados.protocolo_ceua} />}
+          <CampoImpressao label="Observações" valor={dados.observacoes} />
+
+          <div style={{ marginTop: 10 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: "#5C5C52" }}>Resumo do histórico</span>
+            <p style={{ fontSize: 12, color: "#2B2B24", margin: "2px 0 0 0" }}>
+              {(impressao.atendimentosDoAnimal || []).length} atendimento(s) clínico(s) · {(impressao.reproducoesDoAnimal || []).length} registro(s) reprodutivo(s)
+            </p>
+          </div>
+        </>
+      )}
+
       <RodapeImpressao />
     </div>
   );
 }
 
-function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, voltar, onEditarAnimal, onExcluirAnimal }) {
+function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, voltar, onEditarAnimal, onExcluirAnimal, onImprimir }) {
   const animal = animais.find(a => a.sip === sip);
   if (!animal) return <p className="text-sm p-6 text-gray-400">Animal não localizado no banco central.</p>;
 
@@ -1434,6 +1464,7 @@ function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, voltar, onEdit
       <div className="flex justify-between items-center">
         <Btn variant="ghost" onClick={voltar} className="!px-2"><ArrowLeft size={14} /> Voltar</Btn>
         <div className="flex gap-2">
+          <Btn variant="ghost" onClick={() => onImprimir({ tipo: "animal", dados: animal, animal, atendimentosDoAnimal: as, reproducoesDoAnimal: rs })}><FileDown size={13} /> Imprimir / PDF</Btn>
           <Btn variant="danger" onClick={() => { if(confirm(`Deseja remover permanentemente o registro de ${animal.sip}?`)) onExcluirAnimal(animal.sip); }}><Trash2 size={13} /> Excluir</Btn>
           <Btn onClick={() => onEditarAnimal(animal)} className="!bg-[#4A7C7C] hover:!bg-[#3A6363]"><Edit3 size={13} /> Editar Ficha</Btn>
         </div>
