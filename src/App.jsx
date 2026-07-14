@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Search, Plus, ChevronRight, X, Save, Home, PawPrint, Stethoscope,
-  Heart, Skull, AlertTriangle, Trash2, ArrowLeft, Loader2, Check, LogOut, Edit3, Calendar, BookOpen
+  Heart, Skull, AlertTriangle, Trash2, ArrowLeft, Loader2, Check, LogOut, Edit3, Calendar, BookOpen, FileDown
 } from "lucide-react";
 import { supabase } from "./supabaseClient";
 import Login from "./Login";
@@ -246,6 +246,16 @@ export default function App() {
   const [bulario, setBulario] = useState([]);
   const [busca, setBusca] = useState("");
   const [toast, setToast] = useState(null);
+  const [impressao, setImpressao] = useState(null);
+
+  useEffect(() => {
+    if (impressao) {
+      const t = setTimeout(() => window.print(), 150);
+      const aoTerminar = () => setImpressao(null);
+      window.onafterprint = aoTerminar;
+      return () => clearTimeout(t);
+    }
+  }, [impressao]);
   const [session, setSession] = useState(undefined);
   const [animalParaEditar, setAnimalParaEditar] = useState(null);
 
@@ -303,7 +313,8 @@ export default function App() {
   const resultadosBusca = buscaLower ? animais.filter(a => (a.sip || "").toLowerCase().includes(buscaLower) || (a.linhagem || "").toLowerCase().includes(buscaLower)) : [];
 
   return (
-    <div className="min-h-screen flex bg-[#F7F5F0] text-gray-800 font-sans antialiased">
+    <>
+    <div id="app-root-ui" className="min-h-screen flex bg-[#F7F5F0] text-gray-800 font-sans antialiased">
       <aside className="w-56 shrink-0 bg-[#1B3A54] text-[#E9E5D8] flex flex-col shadow-xl">
         <div className="px-5 py-5 border-b border-white/10 bg-[#15293D]">
           <p className="text-[9px] uppercase tracking-[0.2em] text-[#8FB3B3] font-bold">Centro de Biociências · UFRN</p>
@@ -342,9 +353,9 @@ export default function App() {
             <>
               {modulo === "dashboard" && <Dashboard animais={animais} atendimentos={atendimentos} necropsias={necropsias} reproducoes={reproducoes} goTo={setModulo} />}
               {modulo === "animais" && <ModuloAnimais animais={animais} reload={loadAll} showToast={showToast} goTo={setModulo} forcarEdicao={animalParaEditar} limparForcarEdicao={() => setAnimalParaEditar(null)} />}
-              {modulo === "atendimentos" && <ModuloAtendimentos atendimentos={atendimentos} animais={animais} bulario={bulario} reload={loadAll} showToast={showToast} />}
-              {modulo === "reproducao" && <ModuloReproducao reproducoes={reproducoes} animais={animais} reload={loadAll} showToast={showToast} />}
-              {modulo === "necropsias" && <ModuloNecropsias necropsias={necropsias} animais={animais} reload={loadAll} showToast={showToast} />}
+              {modulo === "atendimentos" && <ModuloAtendimentos atendimentos={atendimentos} animais={animais} bulario={bulario} reload={loadAll} showToast={showToast} onImprimir={setImpressao} />}
+              {modulo === "reproducao" && <ModuloReproducao reproducoes={reproducoes} animais={animais} reload={loadAll} showToast={showToast} onImprimir={setImpressao} />}
+              {modulo === "necropsias" && <ModuloNecropsias necropsias={necropsias} animais={animais} reload={loadAll} showToast={showToast} onImprimir={setImpressao} />}
               {modulo === "bulario" && <ModuloBulario bulario={bulario} reload={loadAll} showToast={showToast} />}
               {modulo.startsWith("animal-detalhe:") && (
                 <AnimalDetalhe sip={modulo.split(":")[1]} animais={animais} atendimentos={atendimentos} reproducoes={reproducoes} voltar={() => setModulo("animais")} onExcluirAnimal={tratarExcluirAnimal} onEditarAnimal={d => { setAnimalParaEditar(d); setModulo("animais"); }} />
@@ -356,6 +367,10 @@ export default function App() {
 
       {toast && <div className="fixed bottom-6 right-6 bg-[#1B3A54] text-white px-4 py-2.5 rounded shadow-xl z-50 flex items-center gap-2 text-xs font-bold"><Check size={14} /> {toast}</div>}
     </div>
+    <div id="area-impressao">
+      {impressao && <AreaImpressao impressao={impressao} animais={animais} />}
+    </div>
+    </>
   );
 }
 
@@ -539,7 +554,7 @@ function ModuloAnimais({ animais, reload, showToast, goTo, forcarEdicao, limparF
 // ---------------------------------------------------------------------------
 // Módulo Atendimentos
 // ---------------------------------------------------------------------------
-function ModuloAtendimentos({ atendimentos, animais, bulario = [], reload, showToast }) {
+function ModuloAtendimentos({ atendimentos, animais, bulario = [], reload, showToast, onImprimir }) {
   const [form, setForm] = useState(null);
   const [aba, setAba] = useState("andamento");
   const [aberto, setAberto] = useState(null);
@@ -636,6 +651,7 @@ function ModuloAtendimentos({ atendimentos, animais, bulario = [], reload, showT
 
                   <div className="flex gap-2 pt-2 border-t border-gray-100">
                     <Btn variant="ghost" onClick={() => setForm(at)}><Edit3 size={12} /> Editar Ficha</Btn>
+                    <Btn variant="ghost" onClick={() => onImprimir({ tipo: "atendimento", dados: at, animal })}><FileDown size={12} /> Imprimir / PDF</Btn>
                     <Btn variant="danger" onClick={async () => { if(confirm("Remover laudo clínico definitivamente?")) { await deleteRecord("atendimentos", "id", at.id); reload(); showToast("Removido com sucesso"); } }}><Trash2 size={12} /> Excluir Ficha</Btn>
                   </div>
                 </div>
@@ -781,7 +797,7 @@ function AtendimentoFormCompleto({ inicial, animais, bulario = [], onSalvar, onC
 // ---------------------------------------------------------------------------
 // Módulo Reprodução
 // ---------------------------------------------------------------------------
-function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
+function ModuloReproducao({ reproducoes, animais, reload, showToast, onImprimir }) {
   const [form, setForm] = useState(null);
   const [aba, setAba] = useState("ativos");
   const [aberto, setAberto] = useState(null);
@@ -860,6 +876,7 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast }) {
 
                   <div className="flex gap-2 pt-1">
                     <Btn variant="ghost" onClick={() => setForm(r)}><Edit3 size={12} /> Editar Prontuário</Btn>
+                    <Btn variant="ghost" onClick={() => onImprimir({ tipo: "reproducao", dados: r, animal })}><FileDown size={12} /> Imprimir / PDF</Btn>
                     <Btn variant="danger" onClick={async () => { if(confirm("Excluir este prontuário reprodutivo permanente?")) { await deleteRecord("reproducao", "id", r.id); reload(); showToast("Removido com sucesso"); } }}><Trash2 size={12} /> Remover Ficha</Btn>
                   </div>
                 </div>
@@ -976,7 +993,7 @@ function ReproducaoFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
 // ---------------------------------------------------------------------------
 // Módulo Necropsias
 // ---------------------------------------------------------------------------
-function ModuloNecropsias({ necropsias, animais, reload, showToast }) {
+function ModuloNecropsias({ necropsias, animais, reload, showToast, onImprimir }) {
   const [form, setForm] = useState(null);
   const [aberto, setAberto] = useState(null);
 
@@ -1027,6 +1044,7 @@ function ModuloNecropsias({ necropsias, animais, reload, showToast }) {
 
                   <div className="flex gap-2 pt-2 border-t">
                     <Btn variant="ghost" onClick={() => setForm(ne)}><Edit3 size={12} /> Editar</Btn>
+                    <Btn variant="ghost" onClick={() => onImprimir({ tipo: "necropsia", dados: ne, animal })}><FileDown size={12} /> Imprimir / PDF</Btn>
                     <Btn variant="danger" onClick={async () => { if(confirm("Excluir laudo de necropsia?")) { await deleteRecord("necropsias", "id", ne.id); reload(); showToast("Laudo removido"); } }}><Trash2 size={12} /> Remover</Btn>
                   </div>
                 </div>
@@ -1271,6 +1289,135 @@ function ArvoreGenealogica({ animal, animais }) {
       <p className="text-[11px] text-gray-400 mt-1">
         Caixas tracejadas indicam animal não cadastrado no sistema (só o código foi informado, sem ficha própria).
       </p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Área de Impressão / PDF
+// ---------------------------------------------------------------------------
+
+function CampoImpressao({ label, valor }) {
+  if (!valor && valor !== 0) return null;
+  return (
+    <div style={{ marginBottom: 6, breakInside: "avoid" }}>
+      <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: "#5C5C52", letterSpacing: 0.3 }}>{label}</span>
+      <p style={{ fontSize: 12, color: "#2B2B24", margin: "1px 0 0 0", whiteSpace: "pre-wrap" }}>{valor}</p>
+    </div>
+  );
+}
+
+function CabecalhoImpressao({ titulo, sip, linhagem, data }) {
+  return (
+    <div style={{ borderBottom: "2px solid #1B3A54", paddingBottom: 10, marginBottom: 14 }}>
+      <p style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: 1, color: "#8FB3B3", margin: 0 }}>Centro de Biociências · UFRN · Biotério Central</p>
+      <h1 style={{ fontSize: 18, fontWeight: 700, color: "#1B3A54", margin: "2px 0" }}>{titulo}</h1>
+      <p style={{ fontSize: 12, color: "#5C5C52", margin: 0 }}>
+        SIP: <strong>{sip}</strong>{linhagem ? ` · Linhagem: ${linhagem}` : ""}{data ? ` · Data: ${fmtDate(data)}` : ""}
+      </p>
+    </div>
+  );
+}
+
+function RodapeImpressao() {
+  return (
+    <div style={{ marginTop: 40, paddingTop: 10, borderTop: "1px solid #D8D3C7" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 30 }}>
+        <div style={{ textAlign: "center", width: "45%" }}>
+          <div style={{ borderTop: "1px solid #2B2B24", paddingTop: 4, fontSize: 11 }}>Assinatura do Responsável</div>
+        </div>
+        <div style={{ textAlign: "center", width: "45%" }}>
+          <div style={{ borderTop: "1px solid #2B2B24", paddingTop: 4, fontSize: 11 }}>Data</div>
+        </div>
+      </div>
+      <p style={{ fontSize: 9, color: "#B5AF9E", marginTop: 20, textAlign: "center" }}>
+        Documento gerado pela Plataforma Biotério Central em {new Date().toLocaleString("pt-BR")}
+      </p>
+    </div>
+  );
+}
+
+function AreaImpressao({ impressao, animais }) {
+  const { tipo, dados, animal } = impressao;
+  const bicho = animal || animais.find((a) => a.sip === (dados.sip || dados.reprodutor_id));
+
+  return (
+    <div style={{ fontFamily: "Arial, sans-serif", padding: 20, maxWidth: 720, margin: "0 auto" }}>
+      {tipo === "atendimento" && (
+        <>
+          <CabecalhoImpressao titulo="Ficha de Atendimento Clínico" sip={dados.sip} linhagem={bicho?.linhagem} data={dados.data} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+            <CampoImpressao label="Responsável" valor={dados.responsavel} />
+            <CampoImpressao label="Peso (g)" valor={dados.peso} />
+            <CampoImpressao label="Escore Corporal" valor={dados.escore_corporal} />
+          </div>
+          <CampoImpressao label="Motivo do Atendimento" valor={dados.motivo_chamado} />
+          <CampoImpressao label="Diagnóstico" valor={dados.diagnostico} />
+          <CampoImpressao label="Conduta Adotada" valor={dados.conduta_adotada} />
+          <CampoImpressao label="Anotações Complementares" valor={dados.descricao_atendimento} />
+          {Array.isArray(dados.tratamentos) && dados.tratamentos.length > 0 && (
+            <div style={{ marginTop: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: "#5C5C52" }}>Tratamentos</span>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, marginTop: 4 }}>
+                <thead><tr style={{ borderBottom: "1px solid #D8D3C7", textAlign: "left" }}><th style={{ padding: 3 }}>Medicamento</th><th style={{ padding: 3 }}>Dose</th><th style={{ padding: 3 }}>Via</th><th style={{ padding: 3 }}>Frequência</th></tr></thead>
+                <tbody>{dados.tratamentos.map((t, i) => <tr key={i} style={{ borderBottom: "1px solid #F0EEE5" }}><td style={{ padding: 3 }}>{t.med}</td><td style={{ padding: 3 }}>{t.dose}</td><td style={{ padding: 3 }}>{t.via}</td><td style={{ padding: 3 }}>{t.freq}</td></tr>)}</tbody>
+              </table>
+            </div>
+          )}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
+            <CampoImpressao label="Desfecho" valor={dados.desfecho ? `${dados.desfecho} (${fmtDate(dados.data_desfecho)})` : null} />
+            <CampoImpressao label="Retorno Previsto" valor={dados.data_retorno ? fmtDate(dados.data_retorno) : null} />
+          </div>
+        </>
+      )}
+
+      {tipo === "necropsia" && (
+        <>
+          <CabecalhoImpressao titulo="Laudo de Necropsia" sip={dados.sip} linhagem={bicho?.linhagem} data={dados.data} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+            <CampoImpressao label="Responsável" valor={dados.responsavel} />
+            <CampoImpressao label="Método Eutanásia" valor={dados.metodo_eutanasia} />
+            <CampoImpressao label="Condição da Carcaça" valor={dados.condicao_carcaca} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <CampoImpressao label="Escore BCS" valor={dados.escore_corporal} />
+            <CampoImpressao label="Cromodacriorreia" valor={dados.cromo} />
+          </div>
+          {ACHADOS_SISTEMA_NECROPSIA.map((s) => (
+            <CampoImpressao key={s.k} label={s.label} valor={dados[s.k]} />
+          ))}
+          <CampoImpressao label="Diagnóstico Macroscópico" valor={dados.diagnostico_macroscopico} />
+          <CampoImpressao label="Diagnóstico Final" valor={dados.diagnostico_final} />
+        </>
+      )}
+
+      {tipo === "reproducao" && (
+        <>
+          <CabecalhoImpressao titulo="Prontuário Reprodutivo" sip={dados.sip} linhagem={bicho?.linhagem} data={dados.data_acasalamento} />
+          <CampoImpressao label="Macho Reprodutor" valor={dados.reprodutor_id} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <CampoImpressao label="Genealogia da Matriz" valor={dados.matriz_pais ? `Progenitores: ${dados.matriz_pais} | Avós Maternos: ${dados.matriz_avos_m || "—"}` : null} />
+            <CampoImpressao label="Genealogia do Reprodutor" valor={dados.rep_pais ? `Progenitores: ${dados.rep_pais} | Avós Paternos: ${dados.rep_avos_p || "—"}` : null} />
+          </div>
+          {Array.isArray(dados.ninhadas) && dados.ninhadas.length > 0 && (
+            <div style={{ marginTop: 8, marginBottom: 8 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", color: "#5C5C52" }}>Histórico de Ninhadas</span>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, marginTop: 4 }}>
+                <thead><tr style={{ borderBottom: "1px solid #D8D3C7", textAlign: "left" }}><th style={{ padding: 3 }}>Data</th><th style={{ padding: 3 }}>Nascidos</th><th style={{ padding: 3 }}>Machos</th><th style={{ padding: 3 }}>Fêmeas</th><th style={{ padding: 3 }}>Desmamados</th></tr></thead>
+                <tbody>{dados.ninhadas.map((n, i) => <tr key={i} style={{ borderBottom: "1px solid #F0EEE5" }}><td style={{ padding: 3 }}>{fmtDate(n.data)}</td><td style={{ padding: 3 }}>{n.n_nascidos}</td><td style={{ padding: 3 }}>{n.n_machos}</td><td style={{ padding: 3 }}>{n.n_femeas}</td><td style={{ padding: 3 }}>{n.n_desmamados}</td></tr>)}</tbody>
+              </table>
+            </div>
+          )}
+          {(dados.term_data_matriz || dados.term_data_reprodutor) && (
+            <>
+              <CampoImpressao label="Encerramento — Matriz" valor={dados.term_data_matriz ? `${fmtDate(dados.term_data_matriz)} — ${dados.term_motivo_matriz || "—"}` : null} />
+              <CampoImpressao label="Encerramento — Reprodutor" valor={dados.term_data_reprodutor ? `${fmtDate(dados.term_data_reprodutor)} — ${dados.term_motivo_reprodutor || "—"}` : null} />
+            </>
+          )}
+        </>
+      )}
+
+      <RodapeImpressao />
     </div>
   );
 }
