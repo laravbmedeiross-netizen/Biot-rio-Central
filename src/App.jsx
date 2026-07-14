@@ -916,6 +916,8 @@ function ModuloReproducao({ reproducoes, animais, reload, showToast, onImprimir 
                     <Btn variant="ghost" onClick={() => onImprimir({ tipo: "reproducao", dados: r, animal })}><FileDown size={12} /> Imprimir / PDF</Btn>
                     <Btn variant="danger" onClick={async () => { if(confirm("Excluir este prontuário reprodutivo permanente?")) { await deleteRecord("reproducao", "id", r.id); reload(); showToast("Removido com sucesso"); } }}><Trash2 size={12} /> Remover Ficha</Btn>
                   </div>
+
+                  <AnexosSection tabelaOrigem="reproducao" registroId={r.id} titulo="Fotos e Documentos do Acasalamento" />
                 </div>
               )}
             </div>
