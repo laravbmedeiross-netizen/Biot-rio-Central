@@ -1020,6 +1020,85 @@ function NecropsiaFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
 }
 
 // ---------------------------------------------------------------------------
+function resolveAnimalPorSip(sipVal, animais) {
+  if (!sipVal) return null;
+  return animais.find((a) => a.sip === sipVal) || null;
+}
+
+function CaixaGenealogia({ x, y, w, h, sipTexto, animalResolvido, destaque }) {
+  const cor = animalResolvido ? (LINHAGEM_COR[animalResolvido.linhagem] || "#5C5C52") : "#B5AF9E";
+  const preenchido = !!sipTexto;
+  return (
+    <g>
+      <rect
+        x={x} y={y} width={w} height={h} rx={6}
+        fill={preenchido ? `${cor}14` : "#F7F5F0"}
+        stroke={cor}
+        strokeWidth={destaque ? 2 : 1}
+        strokeDasharray={preenchido ? "0" : "4,3"}
+      />
+      <text x={x + w / 2} y={y + h / 2 + 1} textAnchor="middle" dominantBaseline="middle"
+        fontSize={destaque ? 13 : 11} fontFamily="monospace" fontWeight={destaque ? 700 : 500} fill={preenchido ? "#2B2B24" : "#B5AF9E"}>
+        {sipTexto || "—"}
+      </text>
+      {animalResolvido && (
+        <text x={x + w / 2} y={y + h - 6} textAnchor="middle" fontSize={8} fill={cor}>
+          {animalResolvido.linhagem}
+        </text>
+      )}
+    </g>
+  );
+}
+
+function ArvoreGenealogica({ animal, animais }) {
+  const pai = resolveAnimalPorSip(animal.pai_id, animais);
+  const mae = resolveAnimalPorSip(animal.mae_id, animais);
+  const avoPP = pai ? resolveAnimalPorSip(pai.pai_id, animais) : null; // avô paterno
+  const avoPM = pai ? resolveAnimalPorSip(pai.mae_id, animais) : null; // avó paterna
+  const avoMP = mae ? resolveAnimalPorSip(mae.pai_id, animais) : null; // avô materno
+  const avoMM = mae ? resolveAnimalPorSip(mae.mae_id, animais) : null; // avó materna
+
+  const w = 140, h = 38;
+  const xAvo = 10, xPai = 250, xAnimal = 490;
+  const yAvoPP = 4, yAvoPM = 62, yAvoMP = 130, yAvoMM = 188;
+  const yPai = 45, yMae = 155;
+  const yAnimal = 100;
+
+  const linha = (x1, y1, x2, y2) => (
+    <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#D8D3C7" strokeWidth={1.5} />
+  );
+
+  return (
+    <div className="overflow-x-auto">
+      <svg viewBox="0 0 660 240" className="w-full" style={{ minWidth: 560, maxWidth: 700 }}>
+        {linha(xAvo + w, yAvoPP + h / 2, xPai, yPai + h / 2)}
+        {linha(xAvo + w, yAvoPM + h / 2, xPai, yPai + h / 2)}
+        {linha(xAvo + w, yAvoMP + h / 2, xPai, yMae + h / 2)}
+        {linha(xAvo + w, yAvoMM + h / 2, xPai, yMae + h / 2)}
+        {linha(xPai + w, yPai + h / 2, xAnimal, yAnimal + h / 2)}
+        {linha(xPai + w, yMae + h / 2, xAnimal, yAnimal + h / 2)}
+
+        <CaixaGenealogia x={xAvo} y={yAvoPP} w={w} h={h} sipTexto={pai ? pai.pai_id : ""} animalResolvido={avoPP} />
+        <CaixaGenealogia x={xAvo} y={yAvoPM} w={w} h={h} sipTexto={pai ? pai.mae_id : ""} animalResolvido={avoPM} />
+        <CaixaGenealogia x={xAvo} y={yAvoMP} w={w} h={h} sipTexto={mae ? mae.pai_id : ""} animalResolvido={avoMP} />
+        <CaixaGenealogia x={xAvo} y={yAvoMM} w={w} h={h} sipTexto={mae ? mae.mae_id : ""} animalResolvido={avoMM} />
+
+        <CaixaGenealogia x={xPai} y={yPai} w={w} h={h} sipTexto={animal.pai_id} animalResolvido={pai} />
+        <CaixaGenealogia x={xPai} y={yMae} w={w} h={h} sipTexto={animal.mae_id} animalResolvido={mae} />
+
+        <CaixaGenealogia x={xAnimal} y={yAnimal} w={w} h={h} sipTexto={animal.sip} animalResolvido={animal} destaque />
+
+        <text x={xAvo + w / 2} y={230} textAnchor="middle" fontSize={9} fill="#B5AF9E">Avós</text>
+        <text x={xPai + w / 2} y={230} textAnchor="middle" fontSize={9} fill="#B5AF9E">Pai / Mãe</text>
+        <text x={xAnimal + w / 2} y={230} textAnchor="middle" fontSize={9} fill="#B5AF9E">Animal</text>
+      </svg>
+      <p className="text-[11px] text-gray-400 mt-1">
+        Caixas tracejadas indicam animal não cadastrado no sistema (só o código foi informado, sem ficha própria).
+      </p>
+    </div>
+  );
+}
+
 function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, voltar, onEditarAnimal, onExcluirAnimal }) {
   const animal = animais.find(a => a.sip === sip);
   if (!animal) return <p className="text-sm p-6 text-gray-400">Animal não localizado no banco central.</p>;
@@ -1059,6 +1138,11 @@ function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, voltar, onEdit
         )}
 
         {animal.observacoes && <div className="mt-3 text-xs bg-gray-50 p-2.5 rounded text-gray-600 border border-dashed italic">Notas Internas: {animal.observacoes}</div>}
+      </div>
+
+      <div className="bg-white border rounded-lg p-4 shadow-sm">
+        <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-3 border-b pb-1">Árvore Genealógica</h4>
+        <ArvoreGenealogica animal={animal} animais={animais} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
