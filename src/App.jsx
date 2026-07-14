@@ -1088,7 +1088,12 @@ function ModuloBulario({ bulario, reload, showToast }) {
       {form && <BularioForm inicial={form} onSalvar={salvar} onCancelar={() => setForm(null)} />}
 
       {bulario.length === 0 && !form ? (
-        <EmptyState icon={BookOpen} title="Nenhum medicamento cadastrado" subtitle="Cadastre os medicamentos que vocês mais usam, com a dose por kg." action={<Btn onClick={() => setForm({})}><Plus size={14} /> Novo medicamento</Btn>} />
+        <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-gray-200 rounded-lg">
+          <BookOpen size={28} className="text-gray-300 mb-3" />
+          <p className="text-gray-700 font-medium mb-1">Nenhum medicamento cadastrado</p>
+          <p className="text-sm text-gray-400 mb-4">Cadastre os medicamentos que vocês mais usam, com a dose por kg.</p>
+          <Btn onClick={() => setForm({})}><Plus size={14} /> Novo medicamento</Btn>
+        </div>
       ) : (
         <div className="grid gap-2">
           {bulario.map((m) => (
