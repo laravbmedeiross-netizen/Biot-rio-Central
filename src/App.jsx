@@ -98,6 +98,41 @@ async function deleteRecord(table, idField, idValue) {
   if (error) throw error;
 }
 
+async function listAnexosDe(tabelaOrigem, registroId) {
+  const { data, error } = await supabase
+    .from("anexos")
+    .select("*")
+    .eq("tabela_origem", tabelaOrigem)
+    .eq("registro_id", registroId)
+    .order("criado_em", { ascending: false });
+  if (error) return [];
+  return data || [];
+}
+
+async function uploadAnexo(tabelaOrigem, registroId, file) {
+  const nomeSeguro = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const caminho = `${tabelaOrigem}/${registroId}/${Date.now()}_${nomeSeguro}`;
+  const { error: erroUpload } = await supabase.storage.from("anexos").upload(caminho, file);
+  if (erroUpload) throw erroUpload;
+  const { data: urlData } = supabase.storage.from("anexos").getPublicUrl(caminho);
+  const registro = {
+    id: genId("anx"),
+    tabela_origem: tabelaOrigem,
+    registro_id: registroId,
+    nome_arquivo: file.name,
+    tipo_arquivo: file.type.startsWith("image/") ? "imagem" : "pdf",
+    caminho,
+    url: urlData.publicUrl,
+  };
+  await saveRecord("anexos", registro);
+  return registro;
+}
+
+async function excluirAnexo(anexo) {
+  await supabase.storage.from("anexos").remove([anexo.caminho]);
+  await deleteRecord("anexos", "id", anexo.id);
+}
+
 function genId(prefix) {
   return `${prefix}_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 }
@@ -654,6 +689,8 @@ function ModuloAtendimentos({ atendimentos, animais, bulario = [], reload, showT
                     <Btn variant="ghost" onClick={() => onImprimir({ tipo: "atendimento", dados: at, animal })}><FileDown size={12} /> Imprimir / PDF</Btn>
                     <Btn variant="danger" onClick={async () => { if(confirm("Remover laudo clínico definitivamente?")) { await deleteRecord("atendimentos", "id", at.id); reload(); showToast("Removido com sucesso"); } }}><Trash2 size={12} /> Excluir Ficha</Btn>
                   </div>
+
+                  <AnexosSection tabelaOrigem="atendimentos" registroId={at.id} titulo="Fotos e Exames Complementares" />
                 </div>
               )}
             </div>
@@ -1047,6 +1084,8 @@ function ModuloNecropsias({ necropsias, animais, reload, showToast, onImprimir }
                     <Btn variant="ghost" onClick={() => onImprimir({ tipo: "necropsia", dados: ne, animal })}><FileDown size={12} /> Imprimir / PDF</Btn>
                     <Btn variant="danger" onClick={async () => { if(confirm("Excluir laudo de necropsia?")) { await deleteRecord("necropsias", "id", ne.id); reload(); showToast("Laudo removido"); } }}><Trash2 size={12} /> Remover</Btn>
                   </div>
+
+                  <AnexosSection tabelaOrigem="necropsias" registroId={ne.id} titulo="Fotos e Laudos Anexados" />
                 </div>
               )}
             </div>
@@ -1106,6 +1145,99 @@ function NecropsiaFormCompleto({ inicial, animais, onSalvar, onCancelar }) {
 // ---------------------------------------------------------------------------
 // Bulário interno
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Anexos (fotos e PDFs)
+// ---------------------------------------------------------------------------
+
+function AnexosSection({ tabelaOrigem, registroId, titulo = "Fotos e Documentos" }) {
+  const [anexos, setAnexos] = useState([]);
+  const [enviando, setEnviando] = useState(false);
+  const [carregado, setCarregado] = useState(false);
+
+  async function carregar() {
+    const lista = await listAnexosDe(tabelaOrigem, registroId);
+    setAnexos(lista);
+    setCarregado(true);
+  }
+
+  useEffect(() => {
+    carregar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabelaOrigem, registroId]);
+
+  async function handleUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      alert("Arquivo maior que 10MB. Escolha um arquivo menor.");
+      return;
+    }
+    setEnviando(true);
+    try {
+      await uploadAnexo(tabelaOrigem, registroId, file);
+      await carregar();
+    } catch (err) {
+      alert("Erro ao enviar arquivo: " + (err.message || "tente novamente."));
+    } finally {
+      setEnviando(false);
+      e.target.value = "";
+    }
+  }
+
+  async function handleExcluir(anexo) {
+    if (!confirm(`Remover "${anexo.nome_arquivo}"?`)) return;
+    try {
+      await excluirAnexo(anexo);
+      await carregar();
+    } catch (err) {
+      alert("Erro ao remover: " + (err.message || ""));
+    }
+  }
+
+  return (
+    <div className="mt-3 pt-3 border-t border-gray-100">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400">{titulo}{anexos.length > 0 ? ` (${anexos.length})` : ""}</span>
+        <label className="text-xs text-[#4A7C7C] font-bold cursor-pointer hover:underline">
+          {enviando ? "Enviando…" : "+ Adicionar foto/PDF"}
+          <input type="file" accept="image/*,.pdf" onChange={handleUpload} disabled={enviando} className="hidden" />
+        </label>
+      </div>
+
+      {carregado && anexos.length === 0 && (
+        <p className="text-xs text-gray-400 italic">Nenhum arquivo anexado ainda.</p>
+      )}
+
+      {anexos.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {anexos.map((a) => (
+            <div key={a.id} className="relative group border rounded overflow-hidden" style={{ width: 84, height: 84 }}>
+              <a href={a.url} target="_blank" rel="noopener noreferrer" title={a.nome_arquivo}>
+                {a.tipo_arquivo === "imagem" ? (
+                  <img src={a.url} alt={a.nome_arquivo} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 text-center px-1">
+                    <FileDown size={20} className="text-[#A6493C] mb-1" />
+                    <span className="text-[9px] text-gray-500 truncate w-full">{a.nome_arquivo}</span>
+                  </div>
+                )}
+              </a>
+              <button
+                type="button"
+                onClick={() => handleExcluir(a)}
+                className="absolute top-0.5 right-0.5 bg-white/90 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Remover"
+              >
+                <X size={11} className="text-[#A6493C]" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ModuloBulario({ bulario, reload, showToast }) {
   const [form, setForm] = useState(null);
@@ -1492,6 +1624,8 @@ function AnimalDetalhe({ sip, animais, atendimentos, reproducoes, voltar, onEdit
         )}
 
         {animal.observacoes && <div className="mt-3 text-xs bg-gray-50 p-2.5 rounded text-gray-600 border border-dashed italic">Notas Internas: {animal.observacoes}</div>}
+
+        <AnexosSection tabelaOrigem="animais" registroId={animal.sip} titulo="Fotos do Animal" />
       </div>
 
       <div className="bg-white border rounded-lg p-4 shadow-sm">
